@@ -11,6 +11,11 @@ on:
         required: true
         default: dry-run
         type: string
+      allow_unsigned_macos:
+        description: "Allow publishing without Apple Developer ID signing/notarization."
+        required: true
+        default: false
+        type: boolean
 
 permissions: {}
 
@@ -33,14 +38,25 @@ jobs:
       version: ${{ steps.plan.outputs.version }}
       ref: ${{ steps.plan.outputs.ref }}
       publishing: ${{ steps.plan.outputs.publishing }}
+      macos_signing: ${{ steps.plan.outputs.macos_signing }}
+      allow_unsigned_macos: ${{ steps.plan.outputs.allow_unsigned_macos }}
     steps:
       - name: Determine release mode
         id: plan
         shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_DEVELOPER_IDENTITY: ${{ secrets.APPLE_DEVELOPER_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
           set -euo pipefail
+          allow_unsigned_macos="${{ inputs.allow_unsigned_macos || false }}"
           if [[ "${{ github.event_name }}" == "push" ]]; then
             tag="${GITHUB_REF_NAME}"
+            allow_unsigned_macos="false"
           else
             tag="${{ inputs.tag }}"
           fi
@@ -58,11 +74,18 @@ jobs:
             ref="refs/tags/$tag"
           fi
 
+          macos_signing=false
+          if [[ -n "$APPLE_CERTIFICATE_P12_BASE64" && -n "$APPLE_CERTIFICATE_PASSWORD" && -n "$APPLE_DEVELOPER_IDENTITY" && -n "$APPLE_ID" && -n "$APPLE_TEAM_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
+            macos_signing=true
+          fi
+
           {
             echo "tag=$tag"
             echo "version=$version"
             echo "ref=$ref"
             echo "publishing=$publishing"
+            echo "macos_signing=$macos_signing"
+            echo "allow_unsigned_macos=$allow_unsigned_macos"
           } >> "$GITHUB_OUTPUT"
 
   validate-release:
@@ -103,6 +126,14 @@ jobs:
             exit 1
           fi
 
+      - name: Validate macOS signing policy
+        if: ${{ needs.plan.outputs.publishing == 'true' && needs.plan.outputs.macos_signing != 'true' && needs.plan.outputs.allow_unsigned_macos != 'true' }}
+        shell: bash
+        run: |
+          echo "Publishing without signed/notarized macOS artifacts is disabled."
+          echo "Configure Apple signing secrets, or manually dispatch with allow_unsigned_macos=true for an explicitly unsigned release."
+          exit 1
+
       - name: Run actionlint
         uses: raven-actions/actionlint@v2
 
@@ -128,11 +159,11 @@ jobs:
             binary: md-to-pdf
           - os: macos-latest
             target: x86_64-apple-darwin
-            archive: tar.gz
+            archive: zip
             binary: md-to-pdf
           - os: macos-latest
             target: aarch64-apple-darwin
-            archive: tar.gz
+            archive: zip
             binary: md-to-pdf
           - os: windows-latest
             target: x86_64-pc-windows-msvc
@@ -161,6 +192,36 @@ jobs:
       - name: Build release binary
         run: cargo build --locked --release --target ${{ matrix.target }}
 
+      - name: Import Developer ID certificate
+        if: ${{ runner.os == 'macOS' && needs.plan.outputs.macos_signing == 'true' }}
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/md-to-pdf-signing.keychain-db"
+          cert="$RUNNER_TEMP/developer-id.p12"
+          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > "$cert"
+          security create-keychain -p "" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "" "$keychain"
+          security import "$cert" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain"
+
+      - name: Sign macOS binary
+        if: ${{ runner.os == 'macOS' && needs.plan.outputs.macos_signing == 'true' }}
+        shell: bash
+        env:
+          APPLE_DEVELOPER_IDENTITY: ${{ secrets.APPLE_DEVELOPER_IDENTITY }}
+        run: |
+          set -euo pipefail
+          binary="target/${{ matrix.target }}/release/${BIN_NAME}"
+          codesign --force --options runtime --timestamp --sign "$APPLE_DEVELOPER_IDENTITY" "$binary"
+          codesign -vvv --strict "$binary"
+          codesign -dvv "$binary"
+
       - name: Package archive
         shell: bash
         run: |
@@ -169,12 +230,35 @@ jobs:
           mkdir -p "$staging"
           cp README.md LICENSE "$staging/"
           cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" "$staging/"
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            (cd target/distrib && 7z a "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}")
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            (cd target/distrib && zip -r "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}")
           else
             chmod +x "$staging/${{ matrix.binary }}"
             tar -czf "target/distrib/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.tar.gz" -C target/distrib "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}"
           fi
+
+      - name: Notarize macOS archive
+        if: ${{ runner.os == 'macOS' && needs.plan.outputs.macos_signing == 'true' }}
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          archive="target/distrib/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip"
+          xcrun notarytool submit "$archive" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait
+
+      - name: Assess signed macOS binary
+        if: ${{ runner.os == 'macOS' && needs.plan.outputs.macos_signing == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          spctl -vvv --assess --type exec "target/${{ matrix.target }}/release/${BIN_NAME}"
 
       - name: Generate checksums
         shell: bash
@@ -201,12 +285,16 @@ jobs:
           rm -rf "$verify_dir"
           mkdir -p "$verify_dir"
           if [[ "${{ matrix.archive }}" == "zip" ]]; then
-            7z x "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" -o"$verify_dir"
+            unzip "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" -d "$verify_dir"
           else
             tar -xzf "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.tar.gz" -C "$verify_dir"
           fi
           binary="$verify_dir/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}/${{ matrix.binary }}"
           test -f "$binary"
+          if [[ "${{ matrix.os }}" == "macos-latest" && "${{ needs.plan.outputs.macos_signing }}" == "true" ]]; then
+            codesign -vvv --strict "$binary"
+            spctl -vvv --assess --type exec "$binary"
+          fi
           "$binary" --version
           "$binary" --help
 
@@ -277,7 +365,14 @@ jobs:
 
       - name: Create release notes
         shell: bash
+        env:
+          MACOS_SIGNING: ${{ needs.plan.outputs.macos_signing }}
         run: |
+          if [[ "$MACOS_SIGNING" == "true" ]]; then
+            macos_status="The macOS artifacts in this release are Developer ID signed with the hardened runtime and accepted by Apple's notary service. Verify the SHA-256 checksum before running the binary."
+          else
+            macos_status="The macOS artifacts in this release are not Apple Developer ID signed and are not notarized because this release explicitly allowed unsigned macOS artifacts. Gatekeeper may warn on first run. Verify the SHA-256 checksum before running the binary."
+          fi
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
           ## md-to-pdf ${{ needs.plan.outputs.tag }}
 
@@ -293,12 +388,20 @@ jobs:
 
           ### macOS trust status
 
-          The macOS artifacts in this release are not Apple Developer ID signed and are not notarized. Gatekeeper may warn on first run. Verify the SHA-256 checksum before running the binary. Developer ID signing and notarization are planned for a future release that ships macOS artifacts in a notarization-friendly container.
+          MACOS_STATUS_PLACEHOLDER
 
           ### Verification
 
           Download the archive and matching `.sha256` file, then run `shasum -a 256 -c <file>.sha256` on macOS/Linux or `Get-FileHash` on Windows.
           NOTES
+          python3 - <<'PY' "$RUNNER_TEMP/release-notes.md" "$macos_status"
+          import pathlib
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          status = sys.argv[2]
+          path.write_text(path.read_text().replace("MACOS_STATUS_PLACEHOLDER", status))
+          PY
 
       - name: Create GitHub Release
         env:

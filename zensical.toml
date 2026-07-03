@@ -31,6 +31,7 @@ nav = [
     { "Error messages" = "reference/errors.md" },
   ] },
   { "Maintainers" = [
+    { "macOS signing setup" = "maintainers/macos-signing.md" },
     { "Release checklist" = "maintainers/release-checklist.md" },
   ] },
   { "Explanation" = [

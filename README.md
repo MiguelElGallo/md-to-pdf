@@ -27,12 +27,12 @@ macOS and Linux:
 
 ```sh
 shasum -a 256 -c md-to-pdf-v0.1.1-aarch64-apple-darwin.sha256
-tar -xzf md-to-pdf-v0.1.1-aarch64-apple-darwin.tar.gz
+unzip md-to-pdf-v0.1.1-aarch64-apple-darwin.zip
 sudo install md-to-pdf-v0.1.1-aarch64-apple-darwin/md-to-pdf /usr/local/bin/md-to-pdf
 md-to-pdf --help
 ```
 
-Use `x86_64-apple-darwin` for Intel Macs and `x86_64-unknown-linux-gnu` for Linux.
+Use `x86_64-apple-darwin` for Intel Macs. Linux uses the `x86_64-unknown-linux-gnu.tar.gz` archive with `tar -xzf`.
 
 Windows PowerShell:
 
@@ -46,7 +46,7 @@ Compare the hash with the matching `.sha256` file before running the binary.
 
 ### macOS trust status
 
-The macOS artifacts in `v0.1.1` are not Apple Developer ID signed and are not notarized. Verify the SHA-256 checksum before running the binary and expect Gatekeeper to warn on first run. Developer ID signing and notarization are planned for a future release that ships macOS artifacts in a notarization-friendly container.
+macOS release artifacts are `.zip` archives. When Apple Developer ID secrets are configured for the release workflow, macOS binaries are signed with the hardened runtime and the zip archives are accepted by Apple's notary service. Unsigned macOS publishing is blocked unless a maintainer explicitly allows it in a manual release dispatch. If a release note says the macOS artifacts are unsigned, verify the SHA-256 checksum and expect Gatekeeper to warn on first run.
 
 Install from source for development:
 

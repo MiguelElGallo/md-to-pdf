@@ -8,8 +8,8 @@ Download the archive for your platform from the [latest release](https://github.
 
 | Platform | Archive |
 | --- | --- |
-| macOS Apple Silicon | `md-to-pdf-v0.1.1-aarch64-apple-darwin.tar.gz` |
-| macOS Intel | `md-to-pdf-v0.1.1-x86_64-apple-darwin.tar.gz` |
+| macOS Apple Silicon | `md-to-pdf-v0.1.1-aarch64-apple-darwin.zip` |
+| macOS Intel | `md-to-pdf-v0.1.1-x86_64-apple-darwin.zip` |
 | Linux x86_64 | `md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.tar.gz` |
 | Windows x86_64 | `md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip` |
 
@@ -21,12 +21,12 @@ Run:
 
 ```sh
 shasum -a 256 -c md-to-pdf-v0.1.1-aarch64-apple-darwin.sha256
-tar -xzf md-to-pdf-v0.1.1-aarch64-apple-darwin.tar.gz
+unzip md-to-pdf-v0.1.1-aarch64-apple-darwin.zip
 sudo install md-to-pdf-v0.1.1-aarch64-apple-darwin/md-to-pdf /usr/local/bin/md-to-pdf
 md-to-pdf --help
 ```
 
-Choose the archive name that matches your platform.
+Choose the archive name that matches your platform. Linux uses `tar -xzf` instead of `unzip`.
 
 ## Verify and run on Windows
 
@@ -42,13 +42,15 @@ Compare the printed hash with the matching `.sha256` file.
 
 ## macOS Gatekeeper note
 
-The macOS artifacts in `v0.1.1` are not Apple Developer ID signed and are not notarized. Expect Gatekeeper to treat the archive as unsigned. Developer ID signing and notarization are planned for a future release that ships macOS artifacts in a notarization-friendly container.
+macOS release artifacts are `.zip` archives. When Apple Developer ID secrets are configured for the release workflow, macOS binaries are signed with the hardened runtime and the zip archives are accepted by Apple's notary service. Unsigned macOS publishing is blocked unless a maintainer explicitly allows it in a manual release dispatch. If a release note says the macOS artifacts are unsigned, expect Gatekeeper to treat the archive as unsigned.
 
 Only remove quarantine attributes for a binary after verifying the checksum and deciding that you trust the source:
 
 ```sh
 xattr -dr com.apple.quarantine /usr/local/bin/md-to-pdf
 ```
+
+For a signed release, the release notes should say the macOS artifacts were accepted by Apple's notary service. If Gatekeeper still warns on a signed release, check that you downloaded the matching archive and checksum from the same release.
 
 ## Install from source
 

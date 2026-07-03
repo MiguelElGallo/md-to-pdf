@@ -16,5 +16,7 @@ Before publishing a release:
 - Confirm release artifact attestations are produced.
 - Download each archive from the dry run or release artifacts, verify its checksum, extract it, and run `md-to-pdf --version` and `md-to-pdf --help`.
 - Confirm release notes state the actual macOS signing/notarization status for this release.
-- For `v0.1.1`, verify the install docs clearly say macOS artifacts are unsigned and not notarized.
-- Before a future signed macOS release, switch macOS packaging to `.zip`, `.pkg`, or `.dmg`, then verify `codesign`, notarization, and release notes before publishing.
+- Confirm macOS release artifacts are `.zip` archives.
+- If Apple signing secrets are configured, verify `codesign`, `notarytool`, and `spctl` pass in the release workflow before publishing.
+- If Apple signing secrets are not configured, a tag push must fail before publishing. Use manual dispatch with `allow_unsigned_macos=true` only for an intentionally unsigned release.
+- If an unsigned macOS release is intentionally allowed, verify the release notes clearly say macOS artifacts are unsigned and not notarized.
