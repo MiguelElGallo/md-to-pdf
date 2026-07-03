@@ -2,6 +2,9 @@
 site_name = "md-to-pdf"
 site_description = "Convert Markdown files with Mermaid diagrams to PDF from a Rust CLI."
 site_author = "Miguel P Z"
+site_url = "https://miguelelgallo.github.io/md-to-pdf/"
+repo_url = "https://github.com/MiguelElGallo/md-to-pdf"
+repo_name = "MiguelElGallo/md-to-pdf"
 copyright = """
 Copyright &copy; 2026 Miguel P Z
 """
@@ -40,9 +43,49 @@ nav = [
 
 [project.theme]
 language = "en"
+variant = "classic"
 features = [
+  "announce.dismiss",
+  "content.action.edit",
+  "content.action.view",
+  "content.code.annotate",
   "content.code.copy",
+  "content.code.select",
+  "content.tabs.link",
   "navigation.footer",
   "navigation.indexes",
+  "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.path",
   "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
 ]
+
+[project.theme.icon]
+logo = "lucide/file-text"
+repo = "fontawesome/brands/github"
+
+[project.theme.font]
+text = "Lora"
+code = "JetBrains Mono"
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "teal"
+accent = "amber"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+primary = "teal"
+accent = "amber"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/MiguelElGallo/md-to-pdf"
+name = "GitHub repository"
