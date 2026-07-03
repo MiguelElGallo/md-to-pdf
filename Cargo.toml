@@ -1,0 +1,25 @@
+[package]
+name = "md-to-pdf"
+version = "0.1.0"
+edition = "2021"
+description = "Convert Markdown files with Mermaid diagrams to PDF using a browser renderer."
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0"
+base64 = "0.22"
+camino = "1.1"
+clap = { version = "4.5", features = ["derive", "env"] }
+html-escape = "0.2"
+pulldown-cmark = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tempfile = "3.13"
+tungstenite = "0.24"
+ureq = "2.10"
+url = "2.5"
+which = "7.0"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"

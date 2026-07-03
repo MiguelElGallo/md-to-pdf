@@ -1,0 +1,48 @@
+[project]
+site_name = "md-to-pdf"
+site_description = "Convert Markdown files with Mermaid diagrams to PDF from a Rust CLI."
+site_author = "Miguel P Z"
+copyright = """
+Copyright &copy; 2026 Miguel P Z
+"""
+
+nav = [
+  { "Start" = "index.md" },
+  { "Tutorials" = [
+    { "Create your first PDF" = "tutorials/first-pdf.md" },
+    { "Render Mermaid diagrams" = "tutorials/markdown-with-mermaid.md" },
+  ] },
+  { "How-to" = [
+    { "Install md-to-pdf" = "how-to/install.md" },
+    { "Choose a browser" = "how-to/choose-a-browser.md" },
+    { "Use Mermaid offline" = "how-to/use-local-mermaid.md" },
+    { "Add print CSS" = "how-to/add-custom-css.md" },
+    { "Include local assets" = "how-to/include-local-assets.md" },
+    { "Debug rendering" = "how-to/debug-rendering.md" },
+    { "Run in CI" = "how-to/run-in-ci.md" },
+  ] },
+  { "Reference" = [
+    { "CLI options" = "reference/cli.md" },
+    { "Configuration" = "reference/configuration.md" },
+    { "Markdown support" = "reference/markdown-support.md" },
+    { "Error messages" = "reference/errors.md" },
+  ] },
+  { "Maintainers" = [
+    { "Release checklist" = "maintainers/release-checklist.md" },
+  ] },
+  { "Explanation" = [
+    { "Rendering pipeline" = "explanation/rendering-pipeline.md" },
+    { "Mermaid rendering" = "explanation/mermaid-rendering.md" },
+    { "Safety model" = "explanation/safety-model.md" },
+    { "Design tradeoffs" = "explanation/design-tradeoffs.md" },
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.code.copy",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.sections",
+]

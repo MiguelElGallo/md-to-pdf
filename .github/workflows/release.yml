@@ -1,0 +1,198 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.1.0. Use dry-run to build artifacts without publishing."
+        required: true
+        default: dry-run
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.tag || github.sha }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  BIN_NAME: md-to-pdf
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      publishing: ${{ steps.plan.outputs.publishing }}
+    steps:
+      - name: Determine release mode
+        id: plan
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="${{ inputs.tag }}"
+          fi
+
+          publishing=false
+          if [[ "$tag" != "dry-run" ]]; then
+            if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Release tag must look like v0.1.0 or v0.1.0-rc.1"
+              exit 1
+            fi
+            publishing=true
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publishing=$publishing" >> "$GITHUB_OUTPUT"
+
+  release-gate:
+    name: Release gate
+    needs: plan
+    if: ${{ needs.plan.outputs.publishing == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release approved
+        run: echo "Release approved for ${{ needs.plan.outputs.tag }}"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Package archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          staging="target/distrib/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}"
+          mkdir -p "$staging"
+          cp README.md LICENSE "$staging/"
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp "target/${{ matrix.target }}/release/${BIN_NAME}.exe" "$staging/"
+            (cd target/distrib && 7z a "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}")
+          else
+            cp "target/${{ matrix.target }}/release/${BIN_NAME}" "$staging/"
+            tar -czf "target/distrib/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.tar.gz" -C target/distrib "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}"
+          fi
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd target/distrib
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum ./*.${{ matrix.archive }} > "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.sha256"
+          else
+            shasum -a 256 ./*.${{ matrix.archive }} > "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.sha256"
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.target }}
+          path: |
+            target/distrib/*.${{ matrix.archive }}
+            target/distrib/*.sha256
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - plan
+      - release-gate
+      - build
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.release-gate.result == 'success' && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release notes
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          ## md-to-pdf
+
+          See the attached archives for platform binaries and SHA-256 checksums.
+          NOTES
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        shell: bash
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            artifacts/*
+
+  dry-run-summary:
+    name: Dry-run summary
+    needs:
+      - plan
+      - build
+    if: ${{ always() && needs.plan.outputs.publishing == 'false' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: List release artifacts
+        shell: bash
+        run: find artifacts -type f -maxdepth 1 -print | sort
