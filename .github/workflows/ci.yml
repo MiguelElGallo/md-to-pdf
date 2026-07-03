@@ -116,7 +116,7 @@ jobs:
       - name: Run browser smoke tests
         env:
           MD_TO_PDF_BROWSER: ${{ steps.chrome.outputs.path }}
-        run: cargo test --locked browser_smoke -- --nocapture
+        run: cargo test --locked browser_smoke -- --nocapture --test-threads=1
 
   docs:
     name: Documentation

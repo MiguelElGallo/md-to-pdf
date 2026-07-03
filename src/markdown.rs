@@ -1,15 +1,9 @@
 use html_escape::encode_text;
 use pulldown_cmark::{html, CodeBlockKind, CowStr, Event, Options, Parser, Tag, TagEnd};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct HtmlOptions {
     pub allow_html: bool,
-}
-
-impl Default for HtmlOptions {
-    fn default() -> Self {
-        Self { allow_html: false }
-    }
 }
 
 pub fn markdown_to_body(markdown: &str, options: &HtmlOptions) -> String {
