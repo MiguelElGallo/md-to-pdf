@@ -1,6 +1,54 @@
 # Install md-to-pdf
 
-This guide shows you how to install the CLI from this repository.
+This guide shows you how to install the CLI from a GitHub Release or from this repository.
+
+## Install from a release archive
+
+Download the archive for your platform from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest):
+
+| Platform | Archive |
+| --- | --- |
+| macOS Apple Silicon | `md-to-pdf-v0.1.1-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `md-to-pdf-v0.1.1-x86_64-apple-darwin.tar.gz` |
+| Linux x86_64 | `md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.tar.gz` |
+| Windows x86_64 | `md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip` |
+
+Download the matching `.sha256` file too.
+
+## Verify and install on macOS or Linux
+
+Run:
+
+```sh
+shasum -a 256 -c md-to-pdf-v0.1.1-aarch64-apple-darwin.sha256
+tar -xzf md-to-pdf-v0.1.1-aarch64-apple-darwin.tar.gz
+sudo install md-to-pdf-v0.1.1-aarch64-apple-darwin/md-to-pdf /usr/local/bin/md-to-pdf
+md-to-pdf --help
+```
+
+Choose the archive name that matches your platform.
+
+## Verify and run on Windows
+
+Run in PowerShell:
+
+```powershell
+Get-FileHash .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip -Algorithm SHA256
+Expand-Archive .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip
+.\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc\md-to-pdf.exe --help
+```
+
+Compare the printed hash with the matching `.sha256` file.
+
+## macOS Gatekeeper note
+
+The macOS artifacts in `v0.1.1` are not Apple Developer ID signed and are not notarized. Expect Gatekeeper to treat the archive as unsigned. Developer ID signing and notarization are planned for a future release that ships macOS artifacts in a notarization-friendly container.
+
+Only remove quarantine attributes for a binary after verifying the checksum and deciding that you trust the source:
+
+```sh
+xattr -dr com.apple.quarantine /usr/local/bin/md-to-pdf
+```
 
 ## Install from source
 

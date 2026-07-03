@@ -109,6 +109,12 @@ fn run(cli: Cli) -> Result<()> {
             anyhow::anyhow!("temporary path is not valid UTF-8: {}", path.display())
         })?
     };
+    if let Some(parent) = html_path.parent() {
+        if !parent.as_str().is_empty() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create HTML output directory {parent}"))?;
+        }
+    }
     fs::write(&html_path, document).with_context(|| format!("failed to write {html_path}"))?;
 
     print_to_pdf(

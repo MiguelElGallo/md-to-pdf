@@ -1,7 +1,7 @@
 use html_escape::{encode_double_quoted_attribute, encode_text};
 
 pub const DEFAULT_MERMAID_URL: &str =
-    "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs";
 
 #[derive(Debug, Clone)]
 pub enum MermaidSource {

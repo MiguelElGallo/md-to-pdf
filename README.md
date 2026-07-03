@@ -1,10 +1,15 @@
 # md-to-pdf
 
+[![CI](https://github.com/MiguelElGallo/md-to-pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/MiguelElGallo/md-to-pdf/actions/workflows/ci.yml)
+[![Documentation](https://github.com/MiguelElGallo/md-to-pdf/actions/workflows/docs.yml/badge.svg)](https://github.com/MiguelElGallo/md-to-pdf/actions/workflows/docs.yml)
+[![Release](https://github.com/MiguelElGallo/md-to-pdf/actions/workflows/release.yml/badge.svg)](https://github.com/MiguelElGallo/md-to-pdf/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/MiguelElGallo/md-to-pdf)](https://github.com/MiguelElGallo/md-to-pdf/releases/latest)
+
 Convert Markdown files into PDFs, including Mermaid diagrams, from a small Rust CLI.
 
 `md-to-pdf` reads one `.md` file, renders GitHub-style Markdown to browser-ready HTML, waits for Mermaid diagrams to finish, and writes a PDF using Chrome, Chromium, or Edge.
 
-Full documentation lives in [docs/index.md](docs/index.md) and is organized with Diataxis: tutorials, how-to guides, reference, and explanation. The site is built with Zensical.
+Full documentation lives in [docs/index.md](docs/index.md) and is organized with Diataxis: tutorials, how-to guides, reference, and explanation. The site is built with [Zensical](https://zensical.org/).
 
 ## Requirements
 
@@ -16,7 +21,34 @@ Plain Markdown conversion does not need network access. Mermaid diagrams use jsD
 
 ## Install
 
-From this repository:
+Download the archive for your platform from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest), then download the matching `.sha256` file.
+
+macOS and Linux:
+
+```sh
+shasum -a 256 -c md-to-pdf-v0.1.1-aarch64-apple-darwin.sha256
+tar -xzf md-to-pdf-v0.1.1-aarch64-apple-darwin.tar.gz
+sudo install md-to-pdf-v0.1.1-aarch64-apple-darwin/md-to-pdf /usr/local/bin/md-to-pdf
+md-to-pdf --help
+```
+
+Use `x86_64-apple-darwin` for Intel Macs and `x86_64-unknown-linux-gnu` for Linux.
+
+Windows PowerShell:
+
+```powershell
+Get-FileHash .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip -Algorithm SHA256
+Expand-Archive .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip
+.\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc\md-to-pdf.exe --help
+```
+
+Compare the hash with the matching `.sha256` file before running the binary.
+
+### macOS trust status
+
+The macOS artifacts in `v0.1.1` are not Apple Developer ID signed and are not notarized. Verify the SHA-256 checksum before running the binary and expect Gatekeeper to warn on first run. Developer ID signing and notarization are planned for a future release that ships macOS artifacts in a notarization-friendly container.
+
+Install from source for development:
 
 ```sh
 cargo install --path .
@@ -113,7 +145,7 @@ sequenceDiagram
 The default Mermaid runtime is loaded from:
 
 ```text
-https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs
+https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs
 ```
 
 For offline or repeatable builds, provide a local browser bundle that exposes `window.mermaid`:
@@ -133,7 +165,7 @@ Invalid Mermaid syntax fails the command with a nonzero exit code before the PDF
 | `--browser <PATH>` | Auto-detect or `MD_TO_PDF_BROWSER` | Use a specific Chrome, Chromium, or Edge executable. |
 | `--page-size <SIZE>` | `A4` | Set a CSS page size such as `Letter`, `Legal`, or `A4`. |
 | `--css <PATH>` | None | Append custom print CSS after the built-in styles. |
-| `--mermaid-url <URL>` | jsDelivr Mermaid 11 | Load Mermaid from a different ES module URL. |
+| `--mermaid-url <URL>` | jsDelivr Mermaid 11.12.0 | Load Mermaid from a different ES module URL. |
 | `--mermaid-js <PATH>` | None | Embed a local Mermaid browser bundle for offline rendering. |
 | `--allow-html` | `false` | Let trusted raw HTML in Markdown pass through. |
 | `--allow-local-files` | `false` | Let browser-rendered HTML read local file references. |
@@ -236,6 +268,7 @@ Deferred for later releases:
 - README quickstart is verified from a fresh clone.
 - macOS, Linux, and Windows browser discovery are checked or documented.
 - Offline Mermaid flow with `--mermaid-js` is verified before publishing a reproducible release.
+- Release artifacts are extracted, checksum-verified, and smoke-tested before publishing.
 
 GitHub Actions includes CI, documentation, and release workflows inspired by Astral's `uv` release setup: strict default permissions, concurrency control, an aggregate required-checks job, Zensical docs builds, multi-platform release artifacts, and SHA-256 checksum files.
 
@@ -244,16 +277,16 @@ Run a release dry run from the Actions tab with the `Release` workflow and `tag=
 Publish a release by pushing a SemVer tag:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
-You can also manually dispatch the `Release` workflow with a tag such as `v0.1.0`. Use protected tags or branch protection if you want approval before publishing.
+You can also manually dispatch the `Release` workflow with a tag such as `v0.1.1`. The release workflow validates that the tag matches the package version before publishing.
 
 ## Roadmap
 
-1. Add CI on macOS, Linux, and Windows with a Chromium-family browser.
-2. Add PDF inspection tests for page count and expected text.
-3. Add `--out-dir` and multiple input support.
-4. Add config/front matter for page size, margins, theme, and Mermaid settings.
-5. Vendor a pinned Mermaid runtime for offline-by-default releases.
+1. Add Apple Developer ID signing and notarization with `.zip`, `.pkg`, or `.dmg` macOS artifacts for trusted downloads.
+2. Add browser smoke coverage on macOS and Windows.
+3. Add PDF inspection tests for page count and expected text.
+4. Add `--out-dir` and multiple input support.
+5. Add config/front matter for page size, margins, theme, and Mermaid settings.

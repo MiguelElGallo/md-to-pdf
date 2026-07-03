@@ -59,6 +59,32 @@ fn invalid_browser_path_fails_clearly() {
 }
 
 #[test]
+fn keep_html_creates_output_parent_directory_before_browser_discovery() {
+    let temp_dir = tempdir().unwrap();
+    let output = temp_dir.path().join("nested/out.pdf");
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            "fixtures/basic.md",
+            "--output",
+            output.to_str().unwrap(),
+            "--keep-html",
+            "--browser",
+            "/definitely/not/a/browser",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("failed to start browser"));
+
+    let html = temp_dir.path().join("nested/out.html");
+    assert!(html.exists());
+    assert!(fs::read_to_string(html)
+        .unwrap()
+        .contains("Markdown to PDF"));
+}
+
+#[test]
 fn browser_smoke_plain_markdown() {
     let Some(browser) = smoke_browser() else {
         eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");

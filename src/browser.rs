@@ -4,12 +4,20 @@ use camino::{Utf8Path, Utf8PathBuf};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
+use std::io;
+use std::net::TcpStream;
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
+use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{connect, Message, WebSocket};
 use url::Url;
+
+const BROWSER_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+const CDP_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
+const CDP_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+const DEVTOOLS_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone)]
 pub struct BrowserOptions {
@@ -66,6 +74,7 @@ pub fn print_to_pdf(
     }
 
     fs::write(pdf_path, bytes).with_context(|| format!("failed to write {pdf_path}"))?;
+    browser_process.close_with(&mut client);
     Ok(())
 }
 
@@ -78,6 +87,12 @@ struct BrowserProcess {
 impl BrowserProcess {
     fn launch(browser: &Utf8Path, options: &BrowserOptions) -> Result<Self> {
         let profile = tempfile::tempdir().context("failed to create browser profile")?;
+        let stderr_path = Utf8PathBuf::from_path_buf(profile.path().join("browser.stderr"))
+            .map_err(|path| {
+                anyhow!("browser stderr path is not valid UTF-8: {}", path.display())
+            })?;
+        let stderr = fs::File::create(&stderr_path)
+            .with_context(|| format!("failed to create browser stderr log {stderr_path}"))?;
         let mut command = Command::new(browser.as_std_path());
         command
             .arg("--headless=new")
@@ -91,7 +106,7 @@ impl BrowserProcess {
                 Utf8Path::from_path(profile.path()).unwrap()
             ))
             .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stderr(Stdio::from(stderr));
 
         if options.allow_local_files {
             command.arg("--allow-file-access-from-files");
@@ -102,31 +117,70 @@ impl BrowserProcess {
         let child = command
             .spawn()
             .with_context(|| format!("failed to start browser at {browser}"))?;
-        let port = read_devtools_port(profile.path(), options.virtual_time_budget_ms)?;
-
-        Ok(Self {
+        let mut browser_process = Self {
             child,
             _profile: profile,
-            port,
-        })
+            port: 0,
+        };
+        let port = match read_devtools_port(
+            &mut browser_process.child,
+            browser_process._profile.path(),
+            &stderr_path,
+        ) {
+            Ok(port) => port,
+            Err(error) => {
+                browser_process.kill();
+                return Err(error);
+            }
+        };
+        browser_process.port = port;
+
+        Ok(browser_process)
     }
 
     fn create_page(&mut self, url: &str) -> Result<PageTarget> {
         let encoded_url = url::form_urlencoded::byte_serialize(url.as_bytes()).collect::<String>();
         let endpoint = format!("http://127.0.0.1:{}/json/new?{}", self.port, encoded_url);
-        let response = ureq::put(&endpoint)
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(DEVTOOLS_HTTP_TIMEOUT)
+            .timeout_read(DEVTOOLS_HTTP_TIMEOUT)
+            .timeout_write(DEVTOOLS_HTTP_TIMEOUT)
+            .build();
+        let response = agent
+            .put(&endpoint)
             .call()
             .with_context(|| format!("failed to create browser page at {endpoint}"))?
             .into_string()
             .context("failed to read browser page response")?;
         serde_json::from_str(&response).context("failed to parse browser page response")
     }
+
+    fn close_with(&mut self, client: &mut CdpClient) {
+        let _ = client.send("Browser.close", json!({}));
+        self.wait_or_kill(Duration::from_secs(2));
+    }
+
+    fn wait_or_kill(&mut self, timeout: Duration) {
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            match self.child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) => thread::sleep(Duration::from_millis(50)),
+                Err(_) => break,
+            }
+        }
+        self.kill();
+    }
+
+    fn kill(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
 }
 
 impl Drop for BrowserProcess {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        self.wait_or_kill(Duration::from_millis(500));
     }
 }
 
@@ -137,13 +191,14 @@ struct PageTarget {
 }
 
 struct CdpClient {
-    socket: WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>,
+    socket: WebSocket<MaybeTlsStream<TcpStream>>,
     next_id: u64,
 }
 
 impl CdpClient {
     fn connect(url: &str) -> Result<Self> {
         let (socket, _) = connect(url).with_context(|| format!("failed to connect to {url}"))?;
+        set_socket_timeout(socket.get_ref(), CDP_CONNECT_TIMEOUT)?;
         Ok(Self { socket, next_id: 1 })
     }
 
@@ -155,11 +210,16 @@ impl CdpClient {
             "method": method,
             "params": params
         });
+        set_socket_timeout(self.socket.get_ref(), CDP_COMMAND_TIMEOUT)?;
         self.socket
             .send(Message::Text(message.to_string()))
             .with_context(|| format!("failed to send browser command {method}"))?;
 
+        let deadline = Instant::now() + CDP_COMMAND_TIMEOUT;
         loop {
+            if Instant::now() >= deadline {
+                bail!("timed out waiting for browser command {method}");
+            }
             let message = self
                 .socket
                 .read()
@@ -178,6 +238,14 @@ impl CdpClient {
             return Ok(value.get("result").cloned().unwrap_or(Value::Null));
         }
     }
+}
+
+fn set_socket_timeout(stream: &MaybeTlsStream<TcpStream>, timeout: Duration) -> Result<()> {
+    if let MaybeTlsStream::Plain(stream) = stream {
+        stream.set_read_timeout(Some(timeout))?;
+        stream.set_write_timeout(Some(timeout))?;
+    }
+    Ok(())
 }
 
 fn wait_for_mermaid(client: &mut CdpClient, timeout: Duration) -> Result<()> {
@@ -230,10 +298,23 @@ fn evaluate_json(client: &mut CdpClient, expression: &str) -> Result<Value> {
         .ok_or_else(|| anyhow!("browser evaluation did not return a value"))
 }
 
-fn read_devtools_port(profile: &std::path::Path, timeout_ms: u64) -> Result<u16> {
+fn read_devtools_port(
+    child: &mut Child,
+    profile: &std::path::Path,
+    stderr_path: &Utf8Path,
+) -> Result<u16> {
     let path = profile.join("DevToolsActivePort");
-    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+    let deadline = Instant::now() + BROWSER_STARTUP_TIMEOUT;
     while Instant::now() < deadline {
+        if let Some(status) = child
+            .try_wait()
+            .context("failed to inspect browser process")?
+        {
+            bail!(
+                "browser exited before opening DevTools port with status {status}: {}",
+                browser_stderr_tail(stderr_path)
+            );
+        }
         if let Ok(contents) = fs::read_to_string(&path) {
             let port = contents
                 .lines()
@@ -246,7 +327,28 @@ fn read_devtools_port(profile: &std::path::Path, timeout_ms: u64) -> Result<u16>
         thread::sleep(Duration::from_millis(50));
     }
 
-    bail!("timed out waiting for browser DevTools port")
+    bail!(
+        "timed out waiting for browser DevTools port: {}",
+        browser_stderr_tail(stderr_path)
+    )
+}
+
+fn browser_stderr_tail(path: &Utf8Path) -> String {
+    match fs::read_to_string(path) {
+        Ok(contents) => contents
+            .lines()
+            .rev()
+            .take(12)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            "browser produced no stderr".to_string()
+        }
+        Err(error) => format!("failed to read browser stderr: {error}"),
+    }
 }
 
 pub fn discover_browser() -> Result<Utf8PathBuf> {

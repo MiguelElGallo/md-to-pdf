@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, for example v0.1.0. Use dry-run to build artifacts without publishing."
+        description: "Release tag, for example v0.1.1. Use dry-run to build artifacts without publishing."
         required: true
         default: dry-run
         type: string
@@ -26,14 +26,19 @@ jobs:
   plan:
     name: Plan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      ref: ${{ steps.plan.outputs.ref }}
       publishing: ${{ steps.plan.outputs.publishing }}
     steps:
       - name: Determine release mode
         id: plan
         shell: bash
         run: |
+          set -euo pipefail
           if [[ "${{ github.event_name }}" == "push" ]]; then
             tag="${GITHUB_REF_NAME}"
           else
@@ -41,29 +46,78 @@ jobs:
           fi
 
           publishing=false
+          ref="${GITHUB_SHA}"
+          version="dry-run"
           if [[ "$tag" != "dry-run" ]]; then
             if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
-              echo "Release tag must look like v0.1.0 or v0.1.0-rc.1"
+              echo "Release tag must look like v0.1.1 or v0.1.1-rc.1"
               exit 1
             fi
             publishing=true
+            version="${tag#v}"
+            ref="refs/tags/$tag"
           fi
 
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "publishing=$publishing" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "ref=$ref"
+            echo "publishing=$publishing"
+          } >> "$GITHUB_OUTPUT"
 
-  release-gate:
-    name: Release gate
+  validate-release:
+    name: Validate release
     needs: plan
-    if: ${{ needs.plan.outputs.publishing == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - name: Release approved
-        run: echo "Release approved for ${{ needs.plan.outputs.tag }}"
+      - name: Checkout release ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Cargo version matches tag
+        if: ${{ needs.plan.outputs.publishing == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "md-to-pdf") | .version')
+          if [[ "$cargo_version" != "${{ needs.plan.outputs.version }}" ]]; then
+            echo "Cargo.toml version $cargo_version does not match tag ${{ needs.plan.outputs.tag }}"
+            exit 1
+          fi
+
+      - name: Run actionlint
+        uses: raven-actions/actionlint@v2
+
+      - name: Run release checks
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+          uv run --locked --group docs zensical build --clean --strict
 
   build:
     name: Build ${{ matrix.target }}
-    needs: plan
+    needs:
+      - plan
+      - validate-release
     strategy:
       fail-fast: false
       matrix:
@@ -71,20 +125,27 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             archive: tar.gz
+            binary: md-to-pdf
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
+            binary: md-to-pdf
           - os: macos-latest
             target: aarch64-apple-darwin
             archive: tar.gz
+            binary: md-to-pdf
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             archive: zip
+            binary: md-to-pdf.exe
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
+      - name: Checkout release ref
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.plan.outputs.ref }}
           persist-credentials: false
 
       - name: Install Rust
@@ -107,11 +168,11 @@ jobs:
           staging="target/distrib/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}"
           mkdir -p "$staging"
           cp README.md LICENSE "$staging/"
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" "$staging/"
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            cp "target/${{ matrix.target }}/release/${BIN_NAME}.exe" "$staging/"
             (cd target/distrib && 7z a "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}")
           else
-            cp "target/${{ matrix.target }}/release/${BIN_NAME}" "$staging/"
+            chmod +x "$staging/${{ matrix.binary }}"
             tar -czf "target/distrib/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.tar.gz" -C target/distrib "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}"
           fi
 
@@ -126,6 +187,29 @@ jobs:
             shasum -a 256 ./*.${{ matrix.archive }} > "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.sha256"
           fi
 
+      - name: Verify packaged artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd target/distrib
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum -c "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.sha256"
+          else
+            shasum -a 256 -c "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.sha256"
+          fi
+          verify_dir="$RUNNER_TEMP/release-verify"
+          rm -rf "$verify_dir"
+          mkdir -p "$verify_dir"
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            7z x "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" -o"$verify_dir"
+          else
+            tar -xzf "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.tar.gz" -C "$verify_dir"
+          fi
+          binary="$verify_dir/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}/${{ matrix.binary }}"
+          test -f "$binary"
+          "$binary" --version
+          "$binary" --help
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -134,22 +218,18 @@ jobs:
             target/distrib/*.${{ matrix.archive }}
             target/distrib/*.sha256
 
-  publish:
-    name: Publish GitHub Release
+  attest:
+    name: Attest artifacts
     needs:
       - plan
-      - release-gate
       - build
-    if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.release-gate.result == 'success' && needs.build.result == 'success' }}
+    if: ${{ always() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      id-token: write
+      attestations: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -157,13 +237,67 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            artifacts/*.tar.gz
+            artifacts/*.zip
+            artifacts/*.sha256
+
+      - name: Upload attested artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-attested
+          path: artifacts/*
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - plan
+      - validate-release
+      - build
+      - attest
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.validate-release.result == 'success' && needs.build.result == 'success' && needs.attest.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+          persist-credentials: false
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-attested
+          path: artifacts
+
       - name: Create release notes
         shell: bash
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          ## md-to-pdf
+          ## md-to-pdf ${{ needs.plan.outputs.tag }}
 
-          See the attached archives for platform binaries and SHA-256 checksums.
+          This release includes platform archives, SHA-256 checksum files, and GitHub artifact attestations.
+
+          ### Changed
+
+          - Added bounded browser startup and Chrome DevTools Protocol command timeouts.
+          - Improved browser cleanup and startup diagnostics.
+          - Fixed `--keep-html` so missing output parent directories are created before writing debug HTML.
+          - Pinned the default Mermaid CDN runtime to Mermaid 11.12.0.
+          - Hardened release validation with tag/version checks, release artifact smoke checks, checksum verification, docs validation, and artifact attestations.
+
+          ### macOS trust status
+
+          The macOS artifacts in this release are not Apple Developer ID signed and are not notarized. Gatekeeper may warn on first run. Verify the SHA-256 checksum before running the binary. Developer ID signing and notarization are planned for a future release that ships macOS artifacts in a notarization-friendly container.
+
+          ### Verification
+
+          Download the archive and matching `.sha256` file, then run `shasum -a 256 -c <file>.sha256` on macOS/Linux or `Get-FileHash` on Windows.
           NOTES
 
       - name: Create GitHub Release
@@ -182,17 +316,18 @@ jobs:
     name: Dry-run summary
     needs:
       - plan
+      - validate-release
       - build
+      - attest
     if: ${{ always() && needs.plan.outputs.publishing == 'false' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: artifacts-*
+          name: artifacts-attested
           path: artifacts
-          merge-multiple: true
 
       - name: List release artifacts
         shell: bash
-        run: find artifacts -type f -maxdepth 1 -print | sort
+        run: find artifacts -maxdepth 1 -type f -print | sort
