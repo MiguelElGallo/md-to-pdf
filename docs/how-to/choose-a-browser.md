@@ -21,6 +21,8 @@ md-to-pdf fixtures/basic.md \
   --browser "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
 ```
 
+Replace the path with the browser executable on your system, such as `/usr/bin/google-chrome` on Linux or `C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe` on Windows.
+
 ## Set a browser path for a shell session
 
 Set `MD_TO_PDF_BROWSER`:

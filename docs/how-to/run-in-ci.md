@@ -21,8 +21,10 @@ In GitHub Actions, use a Chromium-family browser path from the runner:
 - name: Convert docs
   env:
     MD_TO_PDF_BROWSER: ${{ steps.chrome.outputs.path }}
-  run: cargo run -- fixtures/basic.md --output guide.pdf
+  run: cargo run --release -- fixtures/basic.md --output guide.pdf
 ```
+
+This example tests the CLI from the repository. If your workflow downloads a release binary instead, run `md-to-pdf fixtures/basic.md --output guide.pdf`.
 
 ## Prefer local Mermaid in CI
 

@@ -2,6 +2,14 @@
 
 `md-to-pdf` accepts one required input path and the options below.
 
+Common commands:
+
+```sh
+md-to-pdf guide.md
+md-to-pdf guide.md --output dist/guide.pdf
+md-to-pdf guide.md --mermaid-js ./vendor/mermaid.min.js
+```
+
 | Option | Default | Description |
 | --- | --- | --- |
 | `input` | Required | Markdown file to convert. |

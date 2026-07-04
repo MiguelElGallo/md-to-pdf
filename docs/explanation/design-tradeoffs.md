@@ -1,5 +1,7 @@
 # Design tradeoffs
 
+Why choose this dependency shape for the first version?
+
 The project deliberately avoids a pure Rust PDF renderer for the first version.
 
 Rust-native PDF crates are useful for constructing PDFs, but they do not provide modern browser layout or Mermaid rendering. `wkhtmltopdf` has weaker modern JavaScript support. Pandoc is powerful, but it adds a large external dependency and still needs Mermaid integration.

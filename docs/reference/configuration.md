@@ -10,7 +10,13 @@
 
 ## Browser discovery
 
-The CLI checks common Chrome, Chromium, and Edge command names, then common macOS application paths.
+Browser selection uses this precedence:
+
+1. `--browser`
+2. `MD_TO_PDF_BROWSER`
+3. automatic discovery
+
+Automatic discovery checks common Chrome, Chromium, and Edge command names, then common macOS application paths.
 
 On systems where discovery fails, pass `--browser` or set `MD_TO_PDF_BROWSER`.
 

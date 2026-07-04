@@ -12,10 +12,12 @@ Copyright &copy; 2026 Miguel P Z
 nav = [
   { "Start" = "index.md" },
   { "Tutorials" = [
+    { "Overview" = "tutorials/index.md" },
     { "Create your first PDF" = "tutorials/first-pdf.md" },
     { "Render Mermaid diagrams" = "tutorials/markdown-with-mermaid.md" },
   ] },
   { "How-to" = [
+    { "Overview" = "how-to/index.md" },
     { "Install md-to-pdf" = "how-to/install.md" },
     { "Choose a browser" = "how-to/choose-a-browser.md" },
     { "Use Mermaid offline" = "how-to/use-local-mermaid.md" },
@@ -25,20 +27,22 @@ nav = [
     { "Run in CI" = "how-to/run-in-ci.md" },
   ] },
   { "Reference" = [
+    { "Overview" = "reference/index.md" },
     { "CLI options" = "reference/cli.md" },
     { "Configuration" = "reference/configuration.md" },
     { "Markdown support" = "reference/markdown-support.md" },
     { "Error messages" = "reference/errors.md" },
   ] },
-  { "Maintainers" = [
-    { "macOS signing setup" = "maintainers/macos-signing.md" },
-    { "Release checklist" = "maintainers/release-checklist.md" },
-  ] },
   { "Explanation" = [
+    { "Overview" = "explanation/index.md" },
     { "Rendering pipeline" = "explanation/rendering-pipeline.md" },
     { "Mermaid rendering" = "explanation/mermaid-rendering.md" },
     { "Safety model" = "explanation/safety-model.md" },
     { "Design tradeoffs" = "explanation/design-tradeoffs.md" },
+  ] },
+  { "Maintainers" = [
+    { "macOS signing setup" = "maintainers/macos-signing.md" },
+    { "Release checklist" = "maintainers/release-checklist.md" },
   ] },
 ]
 

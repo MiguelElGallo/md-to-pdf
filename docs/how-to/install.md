@@ -6,6 +6,8 @@ This guide shows you how to install the CLI from a GitHub Release or from this r
 
 Download the archive for your platform from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest):
 
+Choose the archive that matches your operating system and CPU.
+
 | Platform | Archive |
 | --- | --- |
 | macOS Apple Silicon | `md-to-pdf-v0.1.1-aarch64-apple-darwin.zip` |
@@ -23,7 +25,9 @@ Run:
 curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | sh
 ```
 
-The installer detects Apple Silicon vs Intel, downloads the latest signed/notarized macOS zip and matching checksum, verifies the checksum, installs to `/usr/local/bin/md-to-pdf`, and removes quarantine from the installed binary.
+The installer detects Apple Silicon vs Intel, downloads the latest macOS archive and matching checksum, verifies the checksum, and installs `md-to-pdf` to `/usr/local/bin`.
+
+Check the release notes for the current macOS signing and notarization status.
 
 ## Verify and install on Linux
 
@@ -46,19 +50,7 @@ Expand-Archive .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip
 .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc\md-to-pdf.exe --help
 ```
 
-Compare the printed hash with the matching `.sha256` file.
-
-## macOS Gatekeeper note
-
-macOS release artifacts are `.zip` archives. When Apple Developer ID secrets are configured for the release workflow, macOS binaries are signed with the hardened runtime and the zip archives are accepted by Apple's notary service. Unsigned macOS publishing is blocked unless a maintainer explicitly allows it in a manual release dispatch. If a release note says the macOS artifacts are unsigned, expect Gatekeeper to treat the archive as unsigned.
-
-Only remove quarantine attributes for a binary after verifying the checksum and deciding that you trust the source:
-
-```sh
-xattr -dr com.apple.quarantine /usr/local/bin/md-to-pdf
-```
-
-For a signed release, the release notes should say the macOS artifacts were accepted by Apple's notary service. If Gatekeeper still warns on a signed release, check that you downloaded the matching archive and checksum from the same release.
+Open the matching `.sha256` file and confirm its hash matches the `Get-FileHash` output before running the executable.
 
 ## Install from source
 

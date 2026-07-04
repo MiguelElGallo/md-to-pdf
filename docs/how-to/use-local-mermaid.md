@@ -12,6 +12,8 @@ md-to-pdf fixtures/mermaid-flowchart.md --mermaid-js ./vendor/mermaid.min.js
 
 The local script is embedded in the generated HTML, so the browser does not need to fetch Mermaid from jsDelivr.
 
+Use `--mermaid-js` for a local browser script. Use `--mermaid-url` only when you want the generated HTML to load Mermaid from an ES module URL.
+
 ## Increase render time for large diagrams
 
 If a large diagram needs more time, increase the virtual time budget:

@@ -1,8 +1,16 @@
 # Rendering pipeline
 
+Why does conversion go through HTML and a browser?
+
 `md-to-pdf` uses an HTML-first rendering pipeline because Markdown, Mermaid, CSS, and PDF layout all meet naturally in a browser.
 
-The pipeline is:
+For this command:
+
+```sh
+md-to-pdf guide.md --output guide.pdf
+```
+
+the pipeline is:
 
 1. Parse Markdown with `pulldown-cmark`.
 2. Rewrite fenced Mermaid code blocks into Mermaid containers.
