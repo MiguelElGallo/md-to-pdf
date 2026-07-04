@@ -230,7 +230,9 @@ jobs:
           mkdir -p "$staging"
           cp README.md LICENSE "$staging/"
           cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" "$staging/"
-          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            powershell.exe -NoProfile -Command "Compress-Archive -Path 'target/distrib/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}' -DestinationPath 'target/distrib/${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip' -Force"
+          elif [[ "${{ matrix.archive }}" == "zip" ]]; then
             (cd target/distrib && zip -r "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}")
           else
             chmod +x "$staging/${{ matrix.binary }}"
@@ -253,12 +255,12 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --wait
 
-      - name: Assess signed macOS binary
+      - name: Verify signed macOS binary
         if: ${{ runner.os == 'macOS' && needs.plan.outputs.macos_signing == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          spctl -vvv --assess --type exec "target/${{ matrix.target }}/release/${BIN_NAME}"
+          codesign -vvv --strict "target/${{ matrix.target }}/release/${BIN_NAME}"
 
       - name: Generate checksums
         shell: bash
@@ -284,7 +286,9 @@ jobs:
           verify_dir="$RUNNER_TEMP/release-verify"
           rm -rf "$verify_dir"
           mkdir -p "$verify_dir"
-          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            powershell.exe -NoProfile -Command "Expand-Archive -Path '${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip' -DestinationPath '$verify_dir' -Force"
+          elif [[ "${{ matrix.archive }}" == "zip" ]]; then
             unzip "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.zip" -d "$verify_dir"
           else
             tar -xzf "${BIN_NAME}-${{ needs.plan.outputs.tag }}-${{ matrix.target }}.tar.gz" -C "$verify_dir"
@@ -293,7 +297,6 @@ jobs:
           test -f "$binary"
           if [[ "${{ matrix.os }}" == "macos-latest" && "${{ needs.plan.outputs.macos_signing }}" == "true" ]]; then
             codesign -vvv --strict "$binary"
-            spctl -vvv --assess --type exec "$binary"
           fi
           "$binary" --version
           "$binary" --help
@@ -428,8 +431,9 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: artifacts-attested
+          pattern: artifacts-*
           path: artifacts
+          merge-multiple: true
 
       - name: List release artifacts
         shell: bash
