@@ -1,6 +1,12 @@
+---
+icon: lucide/triangle-alert
+---
+
 # Error messages
 
 This page lists common errors and their likely fixes.
+
+Start with the first line of the error message, then match it against the table below.
 
 | Error starts with | Likely cause | Fix |
 | --- | --- | --- |

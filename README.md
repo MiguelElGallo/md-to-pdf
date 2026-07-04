@@ -9,7 +9,7 @@ Convert one Markdown file into one PDF, with Mermaid diagrams rendered before th
 
 `md-to-pdf` reads one `.md` file, renders GitHub-style Markdown to browser-ready HTML, waits for Mermaid diagrams to finish, and writes a PDF using Chrome, Chromium, or Edge.
 
-Full documentation lives in [docs/index.md](docs/index.md) and is organized with Diataxis: tutorials, how-to guides, reference, and explanation. The site is built with [Zensical](https://zensical.org/).
+Full documentation is published at <https://miguelelgallo.github.io/md-to-pdf/> and organized with [Diataxis](https://diataxis.fr/): tutorials, how-to guides, reference, and explanation. The site is built with [Zensical](https://zensical.org/), and the Markdown sources live in [docs/index.md](docs/index.md).
 
 ## Requirements
 

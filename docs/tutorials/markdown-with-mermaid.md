@@ -1,3 +1,7 @@
+---
+icon: lucide/chart-network
+---
+
 # Render Mermaid diagrams
 
 In this tutorial, we will add a Mermaid diagram to Markdown and produce a PDF that contains the rendered diagram.
@@ -36,7 +40,7 @@ Wrote diagram.pdf
 
 Open `diagram.pdf`. The diagram should appear where the fenced Mermaid block was in the Markdown file.
 
-If the diagram is large or the network is slow, give Mermaid more time:
+Most diagrams render with the default timeout. Increase the budget only when a large diagram or slow network needs more time:
 
 ```sh
 md-to-pdf diagram.md --virtual-time-budget 15000
@@ -66,4 +70,12 @@ Error: Mermaid render failed:
 
 The command fails before reporting success.
 
-Next, read [Use Mermaid offline](../how-to/use-local-mermaid.md) for reproducible builds, or check [Error messages](../reference/errors.md) when a render fails.
+## Recap
+
+You added a Mermaid fenced block, rendered it into a PDF, and saw how `md-to-pdf` reports Mermaid failures before writing a successful result.
+
+## Next steps
+
+- Use [Use Mermaid offline](../how-to/use-local-mermaid.md) for reproducible builds.
+- Diagnose failures with [Debug rendering](../how-to/debug-rendering.md).
+- Check [Error messages](../reference/errors.md) when a diagram fails.

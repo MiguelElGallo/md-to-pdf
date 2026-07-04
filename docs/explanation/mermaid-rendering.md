@@ -1,3 +1,7 @@
+---
+icon: lucide/chart-network
+---
+
 # Mermaid rendering
 
 Why is Mermaid rendered at browser time?

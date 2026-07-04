@@ -1,3 +1,7 @@
+---
+icon: lucide/badge-check
+---
+
 # macOS signing setup
 
 This guide shows maintainers how to configure Developer ID signing and Apple notarization for release workflows.

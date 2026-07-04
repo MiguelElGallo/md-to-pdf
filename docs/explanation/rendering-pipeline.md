@@ -1,3 +1,7 @@
+---
+icon: lucide/workflow
+---
+
 # Rendering pipeline
 
 Why does conversion go through HTML and a browser?
@@ -20,3 +24,5 @@ the pipeline is:
 6. Ask the browser for PDF bytes with `Page.printToPDF`.
 
 The Rust code owns orchestration, paths, escaping, and CLI behavior. The browser owns JavaScript execution, diagram layout, CSS layout, and PDF generation.
+
+Related tasks: [Debug rendering](../how-to/debug-rendering.md) and [Choose a browser](../how-to/choose-a-browser.md).

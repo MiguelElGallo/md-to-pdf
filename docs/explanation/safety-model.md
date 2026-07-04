@@ -1,3 +1,7 @@
+---
+icon: lucide/shield-check
+---
+
 # Safety model
 
 What risks do the defaults reduce, and what remains outside scope?

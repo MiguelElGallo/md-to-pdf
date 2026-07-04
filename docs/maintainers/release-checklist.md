@@ -1,3 +1,7 @@
+---
+icon: lucide/list-checks
+---
+
 # Release checklist
 
 Before publishing a release:

@@ -1,3 +1,7 @@
+---
+icon: lucide/download
+---
+
 # Install md-to-pdf
 
 This guide shows you how to install the CLI from a GitHub Release or from this repository.
@@ -28,6 +32,14 @@ curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/script
 The installer detects Apple Silicon vs Intel, downloads the latest macOS archive and matching checksum, verifies the checksum, and installs `md-to-pdf` to `/usr/local/bin`.
 
 Check the release notes for the current macOS signing and notarization status.
+
+Confirm the command is available:
+
+```sh
+md-to-pdf --help
+```
+
+If the shell cannot find `md-to-pdf`, open a new terminal or check that `/usr/local/bin` is on your `PATH`.
 
 ## Verify and install on Linux
 

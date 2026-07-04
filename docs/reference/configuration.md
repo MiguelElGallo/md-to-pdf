@@ -1,3 +1,7 @@
+---
+icon: lucide/settings
+---
+
 # Configuration
 
 `md-to-pdf` is configured with CLI options and one environment variable.
@@ -19,6 +23,10 @@ Browser selection uses this precedence:
 Automatic discovery checks common Chrome, Chromium, and Edge command names, then common macOS application paths.
 
 On systems where discovery fails, pass `--browser` or set `MD_TO_PDF_BROWSER`.
+
+```sh
+MD_TO_PDF_BROWSER="/usr/bin/google-chrome" md-to-pdf guide.md
+```
 
 ## Output path
 

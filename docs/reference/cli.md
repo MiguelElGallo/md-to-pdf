@@ -1,3 +1,7 @@
+---
+icon: lucide/terminal
+---
+
 # CLI options
 
 `md-to-pdf` accepts one required input path and the options below.
@@ -5,9 +9,10 @@
 Common commands:
 
 ```sh
-md-to-pdf guide.md
-md-to-pdf guide.md --output dist/guide.pdf
-md-to-pdf guide.md --mermaid-js ./vendor/mermaid.min.js
+md-to-pdf guide.md                                      # default output path
+md-to-pdf guide.md --output dist/guide.pdf             # custom output path
+md-to-pdf guide.md --css print.css                     # extra print CSS
+md-to-pdf guide.md --mermaid-js ./vendor/mermaid.min.js # local Mermaid bundle
 ```
 
 | Option | Default | Description |

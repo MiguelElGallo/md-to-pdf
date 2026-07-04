@@ -1,3 +1,7 @@
+---
+icon: lucide/monitor
+---
+
 # Choose a browser
 
 This guide shows you how to control which Chromium-family browser renders the PDF.
@@ -21,7 +25,13 @@ md-to-pdf fixtures/basic.md \
   --browser "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
 ```
 
-Replace the path with the browser executable on your system, such as `/usr/bin/google-chrome` on Linux or `C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe` on Windows.
+Replace the path with the browser executable on your system:
+
+| Platform | Example browser path |
+| --- | --- |
+| macOS Edge | `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge` |
+| Linux Chrome | `/usr/bin/google-chrome` |
+| Windows Chrome | `C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe` |
 
 ## Set a browser path for a shell session
 

@@ -1,10 +1,14 @@
+---
+icon: lucide/file-plus-2
+---
+
 # Create your first PDF
 
 In this tutorial, we will create a small Markdown file and convert it to a PDF.
 
 By the end, you will have an `example.pdf` file next to the Markdown source.
 
-## Check the command
+## Make sure the command is available
 
 Run:
 
@@ -12,7 +16,10 @@ Run:
 md-to-pdf --help
 ```
 
-If you are running from the repository instead of an installed release, use:
+!!! tip
+	If you are running from the repository instead of an installed release, replace `md-to-pdf` with `cargo run --`.
+
+From the repository, check the command with:
 
 ```sh
 cargo run -- --help
@@ -62,4 +69,11 @@ md-to-pdf example.md
 
 The command rewrites `example.pdf`. This repetition is useful: it confirms that converting a Markdown file is a normal, repeatable workflow.
 
-Next, try [Render Mermaid diagrams](markdown-with-mermaid.md), or look up the available flags in [CLI options](../reference/cli.md).
+## Recap
+
+You created `example.md`, converted it with `md-to-pdf example.md`, and confirmed that `example.pdf` was written next to the source file.
+
+## Next steps
+
+- Add a diagram with [Render Mermaid diagrams](markdown-with-mermaid.md).
+- Look up output, browser, and CSS flags in [CLI options](../reference/cli.md).

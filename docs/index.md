@@ -1,44 +1,76 @@
+---
+icon: lucide/file-text
+hide:
+	- navigation
+---
+
 # md-to-pdf documentation
 
 Convert one Markdown file into one PDF, with Mermaid diagrams rendered before the PDF is written.
 
 `md-to-pdf` turns Markdown into browser-ready HTML, waits for Mermaid diagrams to finish, and asks Chrome, Chromium, or Edge to print the page as a PDF.
 
-```text
-Markdown file -> HTML document -> browser rendering -> PDF file
+Start with one file:
+
+```sh
+md-to-pdf guide.md
+```
+
+By default, this writes `guide.pdf` next to `guide.md`.
+
+```mermaid
+flowchart LR
+	markdown["Markdown file"] --> html["HTML document"]
+	html --> browser["Chrome / Chromium / Edge"]
+	browser --> pdf["PDF file"]
 ```
 
 ## Find your way around
 
 This documentation follows the [Diataxis](https://diataxis.fr/) framework. Pick the section that matches what you need right now.
 
-### Tutorials
+<div class="grid cards" markdown>
 
-Learning-oriented lessons. Start here if you want a guided first success.
+-   :lucide-graduation-cap: **Tutorials**
 
-[Create your first PDF](tutorials/first-pdf.md)
+	---
 
-### How-to guides
+	*Learning-oriented.* Start with a small Markdown file, then add Mermaid diagrams.
 
-Task-oriented recipes for installation, browser selection, custom CSS, local assets, Mermaid, and CI.
+	[:lucide-arrow-right: Start learning](tutorials/index.md)
 
-[How-to guides](how-to/index.md)
+-   :lucide-wrench: **How-to guides**
 
-### Reference
+	---
 
-Lookup material for commands, options, defaults, supported Markdown, configuration, and errors.
+	*Task-oriented.* Install the CLI, choose a browser, add CSS, use local assets, debug rendering, and run in CI.
 
-[CLI options](reference/cli.md)
+	[:lucide-arrow-right: Solve a task](how-to/index.md)
 
-### Explanation
+-   :lucide-book-open: **Reference**
 
-Background on why the tool uses a browser, how Mermaid rendering works, and what the safety defaults protect.
+	---
 
-[Rendering pipeline](explanation/rendering-pipeline.md)
+	*Information-oriented.* Look up CLI options, defaults, supported Markdown, configuration, and errors.
+
+	[:lucide-arrow-right: Look up details](reference/index.md)
+
+-   :lucide-lightbulb: **Explanation**
+
+	---
+
+	*Understanding-oriented.* Learn why `md-to-pdf` uses a browser and how Mermaid, safety, and tradeoffs work.
+
+	[:lucide-arrow-right: Understand the design](explanation/index.md)
+
+</div>
 
 ## Requirements
 
-You need Chrome, Chromium, or Microsoft Edge. Plain Markdown conversion works offline; Mermaid diagrams use jsDelivr by default unless you provide a local Mermaid browser bundle.
+!!! note "Browser required"
+	`md-to-pdf` needs Chrome, Chromium, or Microsoft Edge for PDF rendering.
+
+Plain Markdown conversion works offline. Mermaid diagrams use jsDelivr by default unless you provide a local Mermaid browser bundle.
 
 See [Install md-to-pdf](how-to/install.md) for platform-specific installation steps.
 

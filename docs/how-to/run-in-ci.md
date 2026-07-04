@@ -1,3 +1,7 @@
+---
+icon: lucide/git-branch
+---
+
 # Run md-to-pdf in CI
 
 This guide shows you how to run `md-to-pdf` in automation.
@@ -29,3 +33,12 @@ This example tests the CLI from the repository. If your workflow downloads a rel
 ## Prefer local Mermaid in CI
 
 For reproducible CI, pass `--mermaid-js` with a pinned local bundle instead of using the default CDN URL.
+
+```yaml
+- name: Convert Mermaid doc
+  env:
+    MD_TO_PDF_BROWSER: ${{ steps.chrome.outputs.path }}
+  run: cargo run --release -- docs/guide.md --output guide.pdf --mermaid-js vendor/mermaid.min.js
+```
+
+See [Use Mermaid offline](use-local-mermaid.md) for the local bundle requirement and [CLI options](../reference/cli.md) for exact flags.

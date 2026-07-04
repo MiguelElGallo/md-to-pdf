@@ -1,3 +1,7 @@
+---
+icon: lucide/file-code
+---
+
 # Markdown support
 
 Markdown is parsed with `pulldown-cmark`.

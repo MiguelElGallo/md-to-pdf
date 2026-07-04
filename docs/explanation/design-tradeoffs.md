@@ -1,3 +1,7 @@
+---
+icon: lucide/scale
+---
+
 # Design tradeoffs
 
 Why choose this dependency shape for the first version?
