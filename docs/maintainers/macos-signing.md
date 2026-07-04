@@ -4,6 +4,25 @@ This guide shows maintainers how to configure Developer ID signing and Apple not
 
 Do not paste certificate passwords, app-specific passwords, private keys, or `.p12` contents into issues, pull requests, chat, or documentation.
 
+## Automated setup (recommended)
+
+Run the local helper script instead of exporting and encoding by hand:
+
+```sh
+./scripts/setup-macos-signing-secrets.sh
+```
+
+The script:
+
+- Exports your Developer ID identity from the login keychain into a temporary, randomly password-protected `.p12`.
+- Base64-encodes the `.p12` and pipes it directly into the `APPLE_CERTIFICATE_P12_BASE64` secret.
+- Stores the random export password as `APPLE_CERTIFICATE_PASSWORD`.
+- Sets `APPLE_DEVELOPER_IDENTITY` and `APPLE_TEAM_ID`.
+- Prompts locally (hidden input) for the Apple ID email and app-specific password.
+- Deletes all temporary files on exit.
+
+Secret values are never printed, copied to the clipboard, or written to shell history. The manual steps below are kept as a fallback.
+
 ## Required Apple account setup
 
 You need:
