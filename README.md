@@ -21,18 +21,22 @@ Plain Markdown conversion does not need network access. Mermaid diagrams use jsD
 
 ## Install
 
-Download the archive for your platform from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest), then download the matching `.sha256` file.
-
-macOS and Linux:
+macOS:
 
 ```sh
-shasum -a 256 -c md-to-pdf-v0.1.1-aarch64-apple-darwin.sha256
-unzip md-to-pdf-v0.1.1-aarch64-apple-darwin.zip
-sudo install md-to-pdf-v0.1.1-aarch64-apple-darwin/md-to-pdf /usr/local/bin/md-to-pdf
-md-to-pdf --help
+curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | sh
 ```
 
-Use `x86_64-apple-darwin` for Intel Macs. Linux uses the `x86_64-unknown-linux-gnu.tar.gz` archive with `tar -xzf`.
+The installer detects Apple Silicon vs Intel, downloads the latest signed/notarized macOS zip and matching checksum, verifies the checksum, installs to `/usr/local/bin/md-to-pdf`, and removes quarantine from the installed binary.
+
+Linux:
+
+```sh
+shasum -a 256 -c md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.sha256
+tar -xzf md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.tar.gz
+sudo install md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu/md-to-pdf /usr/local/bin/md-to-pdf
+md-to-pdf --help
+```
 
 Windows PowerShell:
 
