@@ -3,6 +3,8 @@ use predicates::prelude::*;
 use std::fs;
 use tempfile::tempdir;
 
+mod pdf;
+
 #[test]
 fn help_includes_core_options() {
     Command::cargo_bin("md-to-pdf")
@@ -105,7 +107,21 @@ fn browser_smoke_plain_markdown() {
         .assert()
         .success();
 
-    assert!(fs::metadata(output).unwrap().len() > 0);
+    let doc = pdf::load_pdf(&output).expect("generated PDF should be readable");
+    assert_eq!(
+        pdf::page_count(&doc),
+        1,
+        "plain Markdown should fit on one page"
+    );
+    assert!(
+        pdf::contains_text(&doc, "Markdown to PDF").expect("text should be extractable"),
+        "PDF should contain the document heading"
+    );
+    assert!(
+        pdf::contains_text(&doc, "This fixture checks plain Markdown rendering.")
+            .expect("text should be extractable"),
+        "PDF should contain the document body"
+    );
 }
 
 #[test]
@@ -117,21 +133,33 @@ fn browser_smoke_valid_mermaid() {
     let temp_dir = tempdir().unwrap();
     let output = temp_dir.path().join("mermaid.pdf");
 
-    Command::cargo_bin("md-to-pdf")
-        .unwrap()
-        .args([
-            "fixtures/mermaid-flowchart.md",
-            "--output",
-            output.to_str().unwrap(),
-            "--browser",
-            &browser,
-            "--virtual-time-budget",
-            "15000",
-        ])
-        .assert()
-        .success();
+    let mut command = Command::cargo_bin("md-to-pdf").unwrap();
+    command.args([
+        "fixtures/mermaid-flowchart.md",
+        "--output",
+        output.to_str().unwrap(),
+        "--browser",
+        &browser,
+        "--virtual-time-budget",
+        "15000",
+    ]);
+    if let Some(bundle) = mermaid_bundle() {
+        command.args(["--mermaid-js", &bundle]);
+    }
+    command.assert().success();
 
-    assert!(fs::metadata(output).unwrap().len() > 0);
+    let doc = pdf::load_pdf(&output).expect("generated PDF should be readable");
+    assert_eq!(
+        pdf::page_count(&doc),
+        1,
+        "Mermaid fixture should fit on one page"
+    );
+    for label in ["Markdown", "HTML", "Mermaid", "PDF"] {
+        assert!(
+            pdf::contains_text(&doc, label).expect("text should be extractable"),
+            "PDF should contain rendered Mermaid node label: {label}"
+        );
+    }
 }
 
 #[test]
@@ -143,22 +171,94 @@ fn browser_smoke_invalid_mermaid_fails() {
     let temp_dir = tempdir().unwrap();
     let output = temp_dir.path().join("invalid.pdf");
 
-    Command::cargo_bin("md-to-pdf")
-        .unwrap()
-        .args([
-            "fixtures/invalid-mermaid.md",
-            "--output",
-            output.to_str().unwrap(),
-            "--browser",
-            &browser,
-            "--virtual-time-budget",
-            "15000",
-        ])
+    let mut command = Command::cargo_bin("md-to-pdf").unwrap();
+    command.args([
+        "fixtures/invalid-mermaid.md",
+        "--output",
+        output.to_str().unwrap(),
+        "--browser",
+        &browser,
+        "--virtual-time-budget",
+        "15000",
+    ]);
+    if let Some(bundle) = mermaid_bundle() {
+        command.args(["--mermaid-js", &bundle]);
+    }
+    command
         .assert()
         .failure()
         .stderr(predicate::str::contains("Mermaid render failed"));
 }
 
+#[test]
+fn browser_smoke_letter_page_size() {
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let temp_dir = tempdir().unwrap();
+    let output = temp_dir.path().join("letter.pdf");
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            "fixtures/basic.md",
+            "--output",
+            output.to_str().unwrap(),
+            "--browser",
+            &browser,
+            "--page-size",
+            "Letter",
+        ])
+        .assert()
+        .success();
+
+    let doc = pdf::load_pdf(&output).expect("generated PDF should be readable");
+    let (width_mm, height_mm) = pdf::page_size_mm(&doc, 1).expect("page size should be readable");
+    assert!(
+        (width_mm - 215.9).abs() < 1.0,
+        "Letter width should be ~215.9 mm, got {width_mm}"
+    );
+    assert!(
+        (height_mm - 279.4).abs() < 1.0,
+        "Letter height should be ~279.4 mm, got {height_mm}"
+    );
+}
+
+#[test]
+fn browser_smoke_raw_html_is_escaped_by_default() {
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let temp_dir = tempdir().unwrap();
+    let input = temp_dir.path().join("unsafe.md");
+    let output = temp_dir.path().join("safe.pdf");
+    fs::write(&input, "# Safe\n\n<script>alert(1)</script>\n").unwrap();
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            input.to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+            "--browser",
+            &browser,
+        ])
+        .assert()
+        .success();
+
+    let doc = pdf::load_pdf(&output).expect("generated PDF should be readable");
+    assert!(
+        pdf::contains_text(&doc, "<script>alert(1)</script>").expect("text should be extractable"),
+        "raw HTML should be escaped to literal text"
+    );
+}
+
 fn smoke_browser() -> Option<String> {
     std::env::var("MD_TO_PDF_BROWSER").ok()
+}
+
+fn mermaid_bundle() -> Option<String> {
+    std::env::var("MD_TO_PDF_MERMAID_JS").ok()
 }

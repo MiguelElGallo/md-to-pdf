@@ -113,9 +113,15 @@ jobs:
           fi
           echo "path=$browser" >> "$GITHUB_OUTPUT"
 
+      - name: Download Mermaid bundle for reproducible tests
+        shell: bash
+        run: |
+          curl -fsSL --retry 3 -o /tmp/mermaid.min.js "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.min.js"
+
       - name: Run browser smoke tests
         env:
           MD_TO_PDF_BROWSER: ${{ steps.chrome.outputs.path }}
+          MD_TO_PDF_MERMAID_JS: /tmp/mermaid.min.js
         run: cargo test --locked browser_smoke -- --nocapture --test-threads=1
 
   docs:
