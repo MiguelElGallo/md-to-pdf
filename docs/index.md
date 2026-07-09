@@ -1,7 +1,7 @@
 ---
 icon: lucide/file-text
 hide:
-	- navigation
+  - navigation
 ---
 
 # md-to-pdf documentation

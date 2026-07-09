@@ -96,7 +96,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout release ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.plan.outputs.ref }}
           fetch-depth: 0
@@ -174,7 +174,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout release ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.plan.outputs.ref }}
           persist-credentials: false
@@ -302,7 +302,7 @@ jobs:
           "$binary" --help
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ matrix.target }}
           path: |
@@ -322,7 +322,7 @@ jobs:
       attestations: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: artifacts-*
           path: artifacts
@@ -337,7 +337,7 @@ jobs:
             artifacts/*.sha256
 
       - name: Upload attested artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: artifacts-attested
           path: artifacts/*
@@ -355,13 +355,13 @@ jobs:
       contents: write
     steps:
       - name: Checkout release ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.plan.outputs.ref }}
           persist-credentials: false
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: artifacts-attested
           path: artifacts
@@ -427,7 +427,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: artifacts-*
           path: artifacts
