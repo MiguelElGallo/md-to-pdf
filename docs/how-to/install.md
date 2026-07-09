@@ -11,13 +11,14 @@ This guide shows you how to install the CLI from a GitHub Release or from this r
 Download the archive for your platform from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest):
 
 Choose the archive that matches your operating system and CPU.
+The names below use `<tag>` for the release tag, such as `v0.1.3`.
 
 | Platform | Archive |
 | --- | --- |
-| macOS Apple Silicon | `md-to-pdf-v0.1.1-aarch64-apple-darwin.zip` |
-| macOS Intel | `md-to-pdf-v0.1.1-x86_64-apple-darwin.zip` |
-| Linux x86_64 | `md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.tar.gz` |
-| Windows x86_64 | `md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip` |
+| macOS Apple Silicon | `md-to-pdf-<tag>-aarch64-apple-darwin.zip` |
+| macOS Intel | `md-to-pdf-<tag>-x86_64-apple-darwin.zip` |
+| Linux x86_64 | `md-to-pdf-<tag>-x86_64-unknown-linux-gnu.tar.gz` |
+| Windows x86_64 | `md-to-pdf-<tag>-x86_64-pc-windows-msvc.zip` |
 
 Download the matching `.sha256` file too.
 
@@ -46,9 +47,10 @@ If the shell cannot find `md-to-pdf`, open a new terminal or check that `/usr/lo
 Run:
 
 ```sh
-shasum -a 256 -c md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.sha256
-tar -xzf md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.tar.gz
-sudo install md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu/md-to-pdf /usr/local/bin/md-to-pdf
+VERSION="vX.Y.Z" # replace with the tag of the release you downloaded
+shasum -a 256 -c "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu.sha256"
+tar -xzf "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+sudo install "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu/md-to-pdf" /usr/local/bin/md-to-pdf
 md-to-pdf --help
 ```
 
@@ -57,9 +59,11 @@ md-to-pdf --help
 Run in PowerShell:
 
 ```powershell
-Get-FileHash .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip -Algorithm SHA256
-Expand-Archive .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip
-.\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc\md-to-pdf.exe --help
+$version = "vX.Y.Z" # replace with the tag of the release you downloaded
+$archive = ".\md-to-pdf-$version-x86_64-pc-windows-msvc.zip"
+Get-FileHash $archive -Algorithm SHA256
+Expand-Archive $archive
+.\md-to-pdf-$version-x86_64-pc-windows-msvc\md-to-pdf.exe --help
 ```
 
 Open the matching `.sha256` file and confirm its hash matches the `Get-FileHash` output before running the executable.

@@ -30,4 +30,4 @@ MD_TO_PDF_BROWSER="/usr/bin/google-chrome" md-to-pdf guide.md
 
 ## Output path
 
-If `--output` is not passed, the output path is the input path with a `.pdf` extension.
+If `--output` is not passed, the output path replaces the input extension with `.pdf`. The PDF output cannot be the input file; when `--keep-html` is used, the output path also cannot use an `.html` extension.

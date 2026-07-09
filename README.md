@@ -32,18 +32,21 @@ The installer detects Apple Silicon vs Intel, downloads the latest macOS archive
 Linux:
 
 ```sh
-shasum -a 256 -c md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.sha256
-tar -xzf md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu.tar.gz
-sudo install md-to-pdf-v0.1.1-x86_64-unknown-linux-gnu/md-to-pdf /usr/local/bin/md-to-pdf
+VERSION="vX.Y.Z" # replace with the tag of the release you downloaded
+shasum -a 256 -c "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu.sha256"
+tar -xzf "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+sudo install "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu/md-to-pdf" /usr/local/bin/md-to-pdf
 md-to-pdf --help
 ```
 
 Windows PowerShell:
 
 ```powershell
-Get-FileHash .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip -Algorithm SHA256
-Expand-Archive .\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc.zip
-.\md-to-pdf-v0.1.1-x86_64-pc-windows-msvc\md-to-pdf.exe --help
+$version = "vX.Y.Z" # replace with the tag of the release you downloaded
+$archive = ".\md-to-pdf-$version-x86_64-pc-windows-msvc.zip"
+Get-FileHash $archive -Algorithm SHA256
+Expand-Archive $archive
+.\md-to-pdf-$version-x86_64-pc-windows-msvc\md-to-pdf.exe --help
 ```
 
 Compare the hash with the matching `.sha256` file before running the binary.
@@ -88,7 +91,8 @@ You should see:
 Wrote example.pdf
 ```
 
-The default output path is the input file name with a `.pdf` extension.
+The default output path replaces the input file extension with `.pdf`.
+Use `--title "Release Flow"` to set the document title stored in the generated HTML and PDF metadata; by default, it uses the input file name without its extension.
 
 ## Go deeper
 
@@ -162,11 +166,12 @@ Run a release dry run from the Actions tab with the `Release` workflow and `tag=
 Publish a release by pushing a SemVer tag:
 
 ```sh
-git tag v0.1.1
-git push origin v0.1.1
+VERSION=vX.Y.Z # replace with the new package version
+git tag "$VERSION"
+git push origin "$VERSION"
 ```
 
-You can also manually dispatch the `Release` workflow with a tag such as `v0.1.1`. The release workflow validates that the tag matches the package version before publishing.
+You can also manually dispatch the `Release` workflow with a tag such as `vX.Y.Z`. The release workflow validates that the tag matches the package version before publishing.
 
 ## Roadmap
 

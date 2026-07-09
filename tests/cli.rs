@@ -59,6 +59,54 @@ fn invalid_browser_path_fails_clearly() {
 }
 
 #[test]
+fn output_path_cannot_overwrite_input() {
+    let temp_dir = tempdir().unwrap();
+    let input = temp_dir.path().join("source.md");
+    fs::write(&input, "# Original document\n").unwrap();
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            input.to_str().unwrap(),
+            "--output",
+            input.to_str().unwrap(),
+            "--browser",
+            "/definitely/not/a/browser",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "output path would overwrite the input file",
+        ));
+
+    assert_eq!(fs::read_to_string(input).unwrap(), "# Original document\n");
+}
+
+#[test]
+fn keep_html_rejects_an_html_pdf_output_path() {
+    let temp_dir = tempdir().unwrap();
+    let output = temp_dir.path().join("output.HTML");
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            "fixtures/basic.md",
+            "--output",
+            output.to_str().unwrap(),
+            "--keep-html",
+            "--browser",
+            "/definitely/not/a/browser",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "HTML debug path conflicts with the PDF output",
+        ));
+
+    assert!(!output.exists());
+}
+
+#[test]
 fn keep_html_creates_output_parent_directory_before_browser_discovery() {
     let temp_dir = tempdir().unwrap();
     let output = temp_dir.path().join("nested/out.pdf");
@@ -82,6 +130,33 @@ fn keep_html_creates_output_parent_directory_before_browser_discovery() {
     assert!(fs::read_to_string(html)
         .unwrap()
         .contains("Markdown to PDF"));
+}
+
+#[test]
+fn title_is_written_to_kept_html() {
+    let temp_dir = tempdir().unwrap();
+    let output = temp_dir.path().join("nested/out.pdf");
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            "fixtures/basic.md",
+            "--output",
+            output.to_str().unwrap(),
+            "--title",
+            "Quarterly Report",
+            "--keep-html",
+            "--browser",
+            "/definitely/not/a/browser",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("failed to start browser"));
+
+    let html = temp_dir.path().join("nested/out.html");
+    assert!(fs::read_to_string(html)
+        .unwrap()
+        .contains("<title>Quarterly Report</title>"));
 }
 
 #[test]

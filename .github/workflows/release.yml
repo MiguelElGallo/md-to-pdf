@@ -383,11 +383,9 @@ jobs:
 
           ### Changed
 
-          - Added bounded browser startup and Chrome DevTools Protocol command timeouts.
-          - Improved browser cleanup and startup diagnostics.
-          - Fixed `--keep-html` so missing output parent directories are created before writing debug HTML.
-          - Pinned the default Mermaid CDN runtime to Mermaid 11.12.0.
-          - Hardened release validation with tag/version checks, release artifact smoke checks, checksum verification, docs validation, and artifact attestations.
+          - Added `--title` to set the generated HTML and PDF document title.
+          - Prevented `--output` and `--keep-html` path combinations from overwriting the Markdown input or colliding with the debug HTML file.
+          - Clarified installation, CI, browser discovery, and error documentation.
 
           ### macOS trust status
 

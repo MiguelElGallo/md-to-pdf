@@ -16,7 +16,7 @@ In GitHub Actions, use a Chromium-family browser path from the runner:
   id: chrome
   shell: bash
   run: |
-    browser="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+    browser="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
     if [[ -z "$browser" ]]; then
       echo "No Chromium-family browser found"
       exit 1
@@ -38,7 +38,7 @@ For reproducible CI, pass `--mermaid-js` with a pinned local bundle instead of u
 - name: Convert Mermaid doc
   env:
     MD_TO_PDF_BROWSER: ${{ steps.chrome.outputs.path }}
-  run: cargo run --release -- docs/guide.md --output guide.pdf --mermaid-js vendor/mermaid.min.js
+  run: cargo run --release -- fixtures/mermaid-flowchart.md --output guide.pdf --mermaid-js vendor/mermaid.min.js
 ```
 
 See [Use Mermaid offline](use-local-mermaid.md) for the local bundle requirement and [CLI options](../reference/cli.md) for exact flags.

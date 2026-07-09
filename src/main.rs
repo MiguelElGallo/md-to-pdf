@@ -18,6 +18,10 @@ struct Cli {
     #[arg(short, long)]
     output: Option<Utf8PathBuf>,
 
+    /// Document title stored in the generated HTML and PDF metadata. Defaults to the input file name without its extension.
+    #[arg(long)]
+    title: Option<String>,
+
     /// Chrome, Chromium, or Edge executable to use.
     #[arg(long, env = "MD_TO_PDF_BROWSER")]
     browser: Option<Utf8PathBuf>,
@@ -68,6 +72,8 @@ fn run(cli: Cli) -> Result<()> {
         .clone()
         .map(Ok)
         .unwrap_or_else(|| default_output_path(&cli.input))?;
+    validate_output_paths(&cli.input, &output, cli.keep_html)?;
+
     let markdown =
         fs::read_to_string(&cli.input).with_context(|| format!("failed to read {}", cli.input))?;
     let body = markdown_to_body(
@@ -93,7 +99,10 @@ fn run(cli: Cli) -> Result<()> {
     let document = render_document(
         &body,
         &DocumentOptions {
-            title: cli.input.file_stem().unwrap_or("Document").to_string(),
+            title: cli
+                .title
+                .clone()
+                .unwrap_or_else(|| cli.input.file_stem().unwrap_or("Document").to_string()),
             base_href,
             page_size: cli.page_size.clone(),
             custom_css,
@@ -139,6 +148,41 @@ fn validate_input(input: &Utf8Path) -> Result<()> {
         anyhow::bail!("input path is a directory: {input}");
     }
     Ok(())
+}
+
+fn validate_output_paths(input: &Utf8Path, output: &Utf8Path, keep_html: bool) -> Result<()> {
+    if paths_refer_to_same_file(input, output) {
+        anyhow::bail!("output path would overwrite the input file: {output}");
+    }
+
+    if keep_html {
+        let html = output.with_extension("html");
+        if paths_refer_to_same_file(input, &html) {
+            anyhow::bail!("HTML debug path would overwrite the input file: {html}");
+        }
+        if output
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("html"))
+            || paths_refer_to_same_file(output, &html)
+        {
+            anyhow::bail!(
+                "HTML debug path conflicts with the PDF output: choose an output path that does not end in .html"
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn paths_refer_to_same_file(left: &Utf8Path, right: &Utf8Path) -> bool {
+    if left == right {
+        return true;
+    }
+
+    match (left.canonicalize_utf8(), right.canonicalize_utf8()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
 }
 
 fn input_base_href(input: &Utf8Path) -> Result<Option<String>> {

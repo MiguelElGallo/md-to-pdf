@@ -14,7 +14,7 @@ Run the command without `--browser`:
 md-to-pdf fixtures/basic.md
 ```
 
-The CLI looks for Chrome, Chromium, and Microsoft Edge in common locations.
+The CLI looks for Chrome, Chromium, and Microsoft Edge command names on `PATH`, then checks common macOS application paths.
 
 ## Set a browser path for one command
 
