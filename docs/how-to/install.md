@@ -32,6 +32,12 @@ curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/script
 
 The installer detects Apple Silicon vs Intel, downloads the latest macOS archive and matching checksum, verifies the checksum, and installs `md-to-pdf` to `/usr/local/bin`.
 
+To install a specific release instead of the latest one, set `MD_TO_PDF_VERSION`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | MD_TO_PDF_VERSION=v0.1.3 sh
+```
+
 Check the release notes for the current macOS signing and notarization status.
 
 Confirm the command is available:

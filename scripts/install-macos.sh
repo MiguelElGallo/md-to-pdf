@@ -19,11 +19,19 @@ case "$arch" in
     ;;
 esac
 
-api_url="https://api.github.com/repos/$repo/releases/latest"
-version="$(curl -fsSL "$api_url" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1)"
+version="${MD_TO_PDF_VERSION:-}"
 if [ -z "$version" ]; then
-  echo "failed to determine latest release version" >&2
-  exit 1
+  latest_url="https://github.com/$repo/releases/latest"
+  release_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "$latest_url")"
+  case "$release_url" in
+    "https://github.com/$repo/releases/tag/"*)
+      version="${release_url##*/}"
+      ;;
+    *)
+      echo "failed to determine latest release version from $release_url" >&2
+      exit 1
+      ;;
+  esac
 fi
 
 archive="$bin_name-$version-$target.zip"
