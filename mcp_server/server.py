@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional
 
 # ---------------------------------------------------------------------------
 # Minimal MCP stdio implementation (no external MCP SDK required)
@@ -72,6 +73,14 @@ _TOOLS = [
                         "Path to Chrome, Chromium, or Edge executable. Falls back "
                         "to MD_TO_PDF_BROWSER environment variable."
                     ),
+                },
+                "css": {
+                    "type": "string",
+                    "description": "Path to an extra CSS file to append after the built-in print styles.",
+                },
+                "mermaid_url": {
+                    "type": "string",
+                    "description": "Mermaid ES module URL for rendering diagrams. Overrides the default CDN URL.",
                 },
             },
             "required": ["input"],
@@ -138,6 +147,12 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     if browser := arguments.get("browser"):
         cmd.extend(["--browser", browser])
 
+    if css := arguments.get("css"):
+        cmd.extend(["--css", css])
+
+    if mermaid_url := arguments.get("mermaid_url"):
+        cmd.extend(["--mermaid-url", mermaid_url])
+
     try:
         result = subprocess.run(
             cmd,
@@ -157,13 +172,16 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         }
 
     if result.returncode != 0:
-        stderr = result.stderr.strip()
+        detail = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
         return {
             "isError": True,
-            "content": [{"type": "text", "text": f"md-to-pdf failed:\n{stderr}"}],
+            "content": [{"type": "text", "text": f"md-to-pdf failed:\n{detail}"}],
         }
 
-    output_msg = result.stdout.strip() or "Conversion complete."
+    # Normalize output: if the CLI printed "Wrote <path>", extract just the path.
+    stdout = result.stdout.strip()
+    match = re.match(r"^Wrote (.+)$", stdout)
+    output_msg = match.group(1) if match else (stdout or "Conversion complete.")
     return {"content": [{"type": "text", "text": output_msg}]}
 
 
@@ -181,8 +199,11 @@ def _error_response(id: Any, code: int, message: str) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}}
 
 
-def _handle(request: dict[str, Any]) -> dict[str, Any] | None:
+def _handle(request: Dict[str, Any]) -> "Optional[Dict[str, Any]]":
     """Return a response dict, or None if the request is a notification."""
+    if not isinstance(request, dict):
+        return _error_response(None, -32600, "Invalid Request: expected a JSON object")
+
     req_id = request.get("id")
     method = request.get("method", "")
     params = request.get("params") or {}
@@ -234,6 +255,10 @@ def main() -> None:
             request = json.loads(raw_line)
         except json.JSONDecodeError as exc:
             _send(_error_response(None, -32700, f"Parse error: {exc}"))
+            continue
+
+        if not isinstance(request, dict):
+            _send(_error_response(None, -32600, "Invalid Request: expected a JSON object"))
             continue
 
         try:
