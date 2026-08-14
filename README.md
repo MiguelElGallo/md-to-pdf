@@ -100,7 +100,119 @@ Wrote example.pdf
 The default output path replaces the input file extension with `.pdf`.
 Use `--title "Release Flow"` to set the document title stored in the generated HTML and PDF metadata; by default, it uses the input file name without its extension.
 
-## Go deeper
+## Agent Plugin (MCP)
+
+`md-to-pdf` ships as an **[Agent Plugins 1.0.0](https://github.com/agentplugins/agent-plugins-spec)**-compliant plugin. Any agent client that supports the spec can load it directly.
+
+### Plugin layout
+
+```
+md-to-pdf/
+├── plugin.json                  # Agent Plugins manifest
+├── mcp.json                     # MCP stdio server config
+├── mcp_server/
+│   └── server.py                # MCP stdio server (Python 3 stdlib, no extra deps)
+└── skills/
+    └── convert-to-pdf/
+        └── SKILL.md             # Agent Skill definition
+```
+
+### Install the plugin
+
+**1. Clone or download the repo** (the plugin root is the repo root):
+
+```sh
+git clone https://github.com/MiguelElGallo/md-to-pdf
+```
+
+**2. Install the `md-to-pdf` binary** (required by the MCP server at runtime):
+
+```sh
+# macOS
+curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | sh
+
+# or build from source
+cargo install --path md-to-pdf
+```
+
+**3. Install a supported browser** (Chrome, Chromium, or Edge) if not already present.
+
+**4. Register the plugin** with your agent client by pointing it at the plugin root. For example, in a client that reads `mcp.json` directly:
+
+```json
+{
+  "plugins": [
+    { "path": "/path/to/md-to-pdf" }
+  ]
+}
+```
+
+The client reads `plugin.json`, discovers the skill in `skills/convert-to-pdf/SKILL.md`, and launches the MCP server defined in `mcp.json` as:
+
+```sh
+python3 /path/to/md-to-pdf/mcp_server/server.py
+```
+
+> No Python packages are required — `server.py` uses only the standard library.
+
+### Use the MCP tool directly
+
+You can also talk to the MCP server manually over stdio (useful for testing):
+
+```sh
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+  | python3 mcp_server/server.py
+```
+
+#### Available tool: `convert_markdown_to_pdf`
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `input` | string | ✅ | — | Path to the Markdown file |
+| `output` | string | | input + `.pdf` | Output PDF path |
+| `title` | string | | filename stem | PDF metadata title |
+| `page_size` | string | | `A4` | CSS page size (`A4`, `Letter`, `Legal`, …) |
+| `css` | string | | — | Extra CSS file to append after built-in styles |
+| `mermaid_url` | string | | jsDelivr CDN | Mermaid ES module URL |
+| `allow_html` | boolean | | `false` | Pass raw HTML through |
+| `allow_local_files` | boolean | | `false` | Allow Chrome local file access |
+| `browser` | string | | `MD_TO_PDF_BROWSER` env | Browser executable path |
+
+Example tool call:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "convert_markdown_to_pdf",
+    "arguments": {
+      "input": "/path/to/document.md",
+      "output": "/path/to/document.pdf",
+      "page_size": "Letter"
+    }
+  }
+}
+```
+
+On success the tool returns the path to the generated PDF:
+
+```json
+{
+  "content": [{ "type": "text", "text": "/path/to/document.pdf" }]
+}
+```
+
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `MD_TO_PDF_BROWSER` | Path to Chrome/Chromium/Edge executable |
+| `MD_TO_PDF_BIN` | Path to `md-to-pdf` binary (overrides PATH lookup) |
+
+
 
 - Follow the guided docs in [docs/index.md](docs/index.md).
 - Look up flags and defaults in [docs/reference/cli.md](docs/reference/cli.md).
