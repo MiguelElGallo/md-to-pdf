@@ -3,11 +3,18 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import platform
 import re
+import shutil
 import subprocess
 import sys
+import tarfile
+import tempfile
+import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -18,8 +25,10 @@ from typing import Any, Dict, Optional
 
 TOOL_NAME = "convert_markdown_to_pdf"
 SERVER_NAME = "md-to-pdf"
-SERVER_VERSION = "0.2.1"
+SERVER_VERSION = "0.2.2"
+BINARY_VERSION = "0.2.1"
 PROTOCOL_VERSION = "2024-11-05"
+REPOSITORY = "MiguelElGallo/md-to-pdf"
 
 _TOOLS = [
     {
@@ -89,6 +98,114 @@ _TOOLS = [
 ]
 
 
+def _release_asset() -> tuple[str, str, str]:
+    """Return the release target, archive suffix, and executable name."""
+    system = platform.system()
+    machine = platform.machine().lower()
+
+    if system == "Darwin" and machine in {"arm64", "aarch64"}:
+        return "aarch64-apple-darwin", "zip", "md-to-pdf"
+    if system == "Darwin" and machine in {"x86_64", "amd64"}:
+        return "x86_64-apple-darwin", "zip", "md-to-pdf"
+    if system == "Linux" and machine in {"x86_64", "amd64"}:
+        return "x86_64-unknown-linux-gnu", "tar.gz", "md-to-pdf"
+    if system == "Windows" and machine in {"x86_64", "amd64"}:
+        return "x86_64-pc-windows-msvc", "zip", "md-to-pdf.exe"
+
+    raise RuntimeError(
+        f"automatic installation is not available for {system} {platform.machine()}"
+    )
+
+
+def _plugin_data_dir() -> Path:
+    """Return writable storage for the downloaded release binary."""
+    plugin_data = os.environ.get("PLUGIN_DATA")
+    if plugin_data and plugin_data != "${PLUGIN_DATA}":
+        return Path(plugin_data)
+
+    if sys.platform == "win32":
+        cache_root = os.environ.get("LOCALAPPDATA")
+        if cache_root:
+            return Path(cache_root) / "md-to-pdf"
+
+    cache_root = os.environ.get("XDG_CACHE_HOME")
+    if cache_root:
+        return Path(cache_root) / "md-to-pdf"
+    return Path.home() / ".cache" / "md-to-pdf"
+
+
+def _download_file(url: str, destination: Path) -> None:
+    request = urllib.request.Request(url, headers={"User-Agent": "md-to-pdf-agent-plugin"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        with destination.open("wb") as output:
+            shutil.copyfileobj(response, output)
+
+
+def _expected_checksum(checksum_path: Path, archive_name: str) -> str:
+    parts = checksum_path.read_text(encoding="utf-8").strip().split()
+    if len(parts) < 2 or not re.fullmatch(r"[0-9a-fA-F]{64}", parts[0]):
+        raise RuntimeError("release checksum file has an invalid format")
+    if Path(parts[-1].lstrip("*")).name != archive_name:
+        raise RuntimeError("release checksum does not name the downloaded archive")
+    return parts[0].lower()
+
+
+def _extract_binary(
+    archive_path: Path, member_name: str, archive_suffix: str, destination: Path
+) -> None:
+    if archive_suffix == "zip":
+        with zipfile.ZipFile(archive_path) as archive:
+            with archive.open(member_name) as source, destination.open("wb") as output:
+                shutil.copyfileobj(source, output)
+        return
+
+    with tarfile.open(archive_path, "r:gz") as archive:
+        member = archive.getmember(member_name)
+        if not member.isfile():
+            raise RuntimeError("release archive binary entry is not a file")
+        source = archive.extractfile(member)
+        if source is None:
+            raise RuntimeError("release archive binary could not be read")
+        with source, destination.open("wb") as output:
+            shutil.copyfileobj(source, output)
+
+
+def _install_md_to_pdf() -> str:
+    """Download and verify the release matching this plugin version."""
+    target, archive_suffix, executable_name = _release_asset()
+    tag = f"v{BINARY_VERSION}"
+    archive_name = f"md-to-pdf-{tag}-{target}.{archive_suffix}"
+    checksum_name = f"md-to-pdf-{tag}-{target}.sha256"
+    base_url = f"https://github.com/{REPOSITORY}/releases/download/{tag}"
+    install_dir = _plugin_data_dir() / "bin"
+    installed_binary = install_dir / f"md-to-pdf-{tag}-{target}"
+    if executable_name.endswith(".exe"):
+        installed_binary = installed_binary.with_suffix(".exe")
+    if installed_binary.is_file():
+        return str(installed_binary)
+
+    install_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=install_dir) as temporary_dir:
+        temporary_path = Path(temporary_dir)
+        archive_path = temporary_path / archive_name
+        checksum_path = temporary_path / checksum_name
+        _download_file(f"{base_url}/{archive_name}", archive_path)
+        _download_file(f"{base_url}/{checksum_name}", checksum_path)
+
+        expected = _expected_checksum(checksum_path, archive_name)
+        actual = hashlib.sha256(archive_path.read_bytes()).hexdigest()
+        if actual != expected:
+            raise RuntimeError("release archive checksum verification failed")
+
+        member_name = f"md-to-pdf-{tag}-{target}/{executable_name}"
+        staged_binary = temporary_path / executable_name
+        _extract_binary(archive_path, member_name, archive_suffix, staged_binary)
+        staged_binary.chmod(0o755)
+        os.replace(staged_binary, installed_binary)
+
+    return str(installed_binary)
+
+
 def _find_md_to_pdf() -> str:
     """Locate the md-to-pdf executable."""
     # 1. Explicit env var override
@@ -106,14 +223,26 @@ def _find_md_to_pdf() -> str:
             return str(candidate)
 
     # 3. PATH
-    import shutil
     found = shutil.which("md-to-pdf")
     if found:
         return found
 
+    if os.environ.get("MD_TO_PDF_AUTO_INSTALL", "1").lower() not in {
+        "0",
+        "false",
+        "no",
+    }:
+        try:
+            return _install_md_to_pdf()
+        except Exception as exc:
+            raise RuntimeError(
+                "md-to-pdf binary was not found and automatic installation failed: "
+                f"{exc}. Install it manually or set MD_TO_PDF_BIN."
+            ) from exc
+
     raise FileNotFoundError(
-        "md-to-pdf binary not found. Build it with `cargo build --release` or "
-        "set the MD_TO_PDF_BIN environment variable."
+        "md-to-pdf binary not found and automatic installation is disabled. "
+        "Install it manually or set MD_TO_PDF_BIN."
     )
 
 
@@ -127,13 +256,19 @@ def _str_arg(value: Any, default: str = "") -> str:
 
 def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """Invoke md-to-pdf with the given arguments and return a result dict."""
-    binary = _find_md_to_pdf()
-
-    cmd: list[str] = [binary]
-
     input_path = _str_arg(arguments.get("input"))
     if not input_path:
         return {"isError": True, "content": [{"type": "text", "text": "Missing required argument: input"}]}
+
+    try:
+        binary = _find_md_to_pdf()
+    except (FileNotFoundError, RuntimeError) as exc:
+        return {
+            "isError": True,
+            "content": [{"type": "text", "text": str(exc)}],
+        }
+
+    cmd: list[str] = [binary]
 
     if output := _str_arg(arguments.get("output")):
         cmd.extend(["--output", output])
@@ -162,21 +297,6 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     # Emit -- before the positional to prevent a leading-dash input value
     # from being parsed as a flag by clap.
     cmd.extend(["--", input_path])
-
-    if arguments.get("allow_html"):
-        cmd.append("--allow-html")
-
-    if arguments.get("allow_local_files"):
-        cmd.append("--allow-local-files")
-
-    if browser := _str_arg(arguments.get("browser")):
-        cmd.extend(["--browser", browser])
-
-    if css := _str_arg(arguments.get("css")):
-        cmd.extend(["--css", css])
-
-    if mermaid_url := _str_arg(arguments.get("mermaid_url")):
-        cmd.extend(["--mermaid-url", mermaid_url])
 
     try:
         result = subprocess.run(

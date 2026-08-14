@@ -121,8 +121,16 @@ jobs:
         run: |
           set -euo pipefail
           cargo_version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "md-to-pdf") | .version')
-          if [[ "$cargo_version" != "${{ needs.plan.outputs.version }}" ]]; then
-            echo "Cargo.toml version $cargo_version does not match tag ${{ needs.plan.outputs.tag }}"
+          plugin_version=$(jq -r '.version' plugin.json)
+          server_version=$(sed -n 's/^SERVER_VERSION = "\([^"]*\)"/\1/p' mcp_server/server.py)
+          binary_version=$(sed -n 's/^BINARY_VERSION = "\([^"]*\)"/\1/p' mcp_server/server.py)
+          expected="${{ needs.plan.outputs.version }}"
+          if [[ "$cargo_version" != "$expected" || "$plugin_version" != "$expected" || "$server_version" != "$expected" || "$binary_version" != "$expected" ]]; then
+            echo "Release versions do not match tag ${{ needs.plan.outputs.tag }}:"
+            echo "  Cargo.toml: $cargo_version"
+            echo "  plugin.json: $plugin_version"
+            echo "  MCP server: $server_version"
+            echo "  downloaded binary: $binary_version"
             exit 1
           fi
 
@@ -142,6 +150,7 @@ jobs:
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked
+          python3 -m unittest discover -s mcp_server -p "test_*.py"
           uv run --locked --group docs zensical build --clean --strict
 
   build:
