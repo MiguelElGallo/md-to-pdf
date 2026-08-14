@@ -10,25 +10,13 @@ Convert Markdown to PDF with Mermaid diagrams using Chrome, Chromium, or Edge.
 This repository is an [Agent Plugins 1.0.0](https://github.com/agentplugins/agent-plugins-spec)-compliant package.
 
 1. Install Python 3 and Chrome, Chromium, or Edge.
-2. Install the `md-to-pdf` binary:
+2. In VS Code, run **Chat: Install Plugin From Source** from the Command Palette.
+3. Enter `https://github.com/MiguelElGallo/md-to-pdf`.
 
-   ```sh
-   # macOS
-   curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | sh
-
-   # Or build from source
-   cargo install --git https://github.com/MiguelElGallo/md-to-pdf
-   ```
-
-3. Clone the plugin:
-
-   ```sh
-   git clone https://github.com/MiguelElGallo/md-to-pdf
-   ```
-
-4. In an Agent Plugins-compatible client, add the cloned repository as the plugin root.
-
-The client reads `plugin.json`, discovers `skills/convert-to-pdf/SKILL.md`, and launches the MCP server from `mcp.json`. The server uses only the Python standard library.
+VS Code clones and enables the plugin. On the first conversion, its dependency-free
+Python MCP server downloads a compatible `md-to-pdf` release binary, verifies its
+SHA-256 checksum, and caches it in the plugin's persistent data directory. No
+administrator access or separate CLI installation is required.
 
 ### MCP tool
 
@@ -44,7 +32,8 @@ Example arguments:
 }
 ```
 
-Set `MD_TO_PDF_BIN` to override the binary path or `MD_TO_PDF_BROWSER` to select a browser.
+Set `MD_TO_PDF_BIN` to use an existing binary or `MD_TO_PDF_BROWSER` to select a
+browser. Set `MD_TO_PDF_AUTO_INSTALL=0` to disable the automatic binary download.
 
 ## Install the CLI
 
