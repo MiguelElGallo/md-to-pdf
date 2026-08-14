@@ -383,9 +383,9 @@ jobs:
 
           ### Changed
 
-          - Added `--title` to set the generated HTML and PDF document title.
-          - Prevented `--output` and `--keep-html` path combinations from overwriting the Markdown input or colliding with the debug HTML file.
-          - Clarified installation, CI, browser discovery, and error documentation.
+          - Added an Agent Plugins 1.0.0 package with a `convert_markdown_to_pdf` skill.
+          - Added a dependency-free Python MCP stdio server wrapping the CLI.
+          - Added concise Agent Plugin installation and usage instructions.
 
           ### macOS trust status
 
