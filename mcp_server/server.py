@@ -18,7 +18,7 @@ from typing import Any, Dict, Optional
 
 TOOL_NAME = "convert_markdown_to_pdf"
 SERVER_NAME = "md-to-pdf"
-SERVER_VERSION = "0.2.0"
+SERVER_VERSION = "0.2.1"
 PROTOCOL_VERSION = "2024-11-05"
 
 _TOOLS = [
