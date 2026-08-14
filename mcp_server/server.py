@@ -117,25 +117,31 @@ def _find_md_to_pdf() -> str:
     )
 
 
+def _str_arg(value: Any, default: str = "") -> str:
+    """Coerce an argument value to a non-empty string, or return default."""
+    if value is None:
+        return default
+    s = str(value).strip()
+    return s if s else default
+
+
 def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """Invoke md-to-pdf with the given arguments and return a result dict."""
     binary = _find_md_to_pdf()
 
     cmd: list[str] = [binary]
 
-    input_path = arguments.get("input", "")
+    input_path = _str_arg(arguments.get("input"))
     if not input_path:
         return {"isError": True, "content": [{"type": "text", "text": "Missing required argument: input"}]}
 
-    cmd.append(input_path)
-
-    if output := arguments.get("output"):
+    if output := _str_arg(arguments.get("output")):
         cmd.extend(["--output", output])
 
-    if title := arguments.get("title"):
+    if title := _str_arg(arguments.get("title")):
         cmd.extend(["--title", title])
 
-    page_size = arguments.get("page_size", "A4")
+    page_size = _str_arg(arguments.get("page_size"), "A4")
     cmd.extend(["--page-size", page_size])
 
     if arguments.get("allow_html"):
@@ -144,13 +150,32 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     if arguments.get("allow_local_files"):
         cmd.append("--allow-local-files")
 
-    if browser := arguments.get("browser"):
+    if browser := _str_arg(arguments.get("browser")):
         cmd.extend(["--browser", browser])
 
-    if css := arguments.get("css"):
+    if css := _str_arg(arguments.get("css")):
         cmd.extend(["--css", css])
 
-    if mermaid_url := arguments.get("mermaid_url"):
+    if mermaid_url := _str_arg(arguments.get("mermaid_url")):
+        cmd.extend(["--mermaid-url", mermaid_url])
+
+    # Emit -- before the positional to prevent a leading-dash input value
+    # from being parsed as a flag by clap.
+    cmd.extend(["--", input_path])
+
+    if arguments.get("allow_html"):
+        cmd.append("--allow-html")
+
+    if arguments.get("allow_local_files"):
+        cmd.append("--allow-local-files")
+
+    if browser := _str_arg(arguments.get("browser")):
+        cmd.extend(["--browser", browser])
+
+    if css := _str_arg(arguments.get("css")):
+        cmd.extend(["--css", css])
+
+    if mermaid_url := _str_arg(arguments.get("mermaid_url")):
         cmd.extend(["--mermaid-url", mermaid_url])
 
     try:
@@ -219,8 +244,8 @@ def _handle(request: Dict[str, Any]) -> "Optional[Dict[str, Any]]":
             },
         }
 
-    if method == "initialized":
-        return None  # notification, no response
+    if method == "initialized" or method.startswith("notifications/"):
+        return None  # lifecycle/other notifications — no response
 
     if method == "tools/list":
         return {
