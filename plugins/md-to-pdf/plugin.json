@@ -1,0 +1,15 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "md-to-pdf",
+  "version": "0.2.2",
+  "description": "Convert Markdown files with Mermaid diagrams to PDF using a browser renderer.",
+  "author": {
+    "name": "MiguelElGallo",
+    "email": "miguel.zurcher@gmail.com",
+    "url": "https://github.com/MiguelElGallo"
+  },
+  "homepage": "https://miguelelgallo.github.io/md-to-pdf/",
+  "repository": "https://github.com/MiguelElGallo/md-to-pdf",
+  "license": "MIT",
+  "keywords": ["markdown", "pdf", "mermaid", "convert", "document"]
+}

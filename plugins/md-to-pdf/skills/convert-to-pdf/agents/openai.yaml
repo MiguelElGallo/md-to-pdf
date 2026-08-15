@@ -1,0 +1,4 @@
+interface:
+  display_name: "md-to-pdf"
+  short_description: "Convert Markdown and Mermaid to PDF"
+  default_prompt: "Use $convert-to-pdf to convert this Markdown document to PDF."

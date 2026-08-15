@@ -1,0 +1,34 @@
+{
+  "name": "md-to-pdf",
+  "version": "0.2.2",
+  "description": "Convert Markdown files with Mermaid diagrams to PDF using a browser renderer.",
+  "author": {
+    "name": "MiguelElGallo",
+    "email": "miguel.zurcher@gmail.com",
+    "url": "https://github.com/MiguelElGallo"
+  },
+  "homepage": "https://miguelelgallo.github.io/md-to-pdf/",
+  "repository": "https://github.com/MiguelElGallo/md-to-pdf",
+  "license": "MIT",
+  "keywords": [
+    "markdown",
+    "pdf",
+    "mermaid",
+    "document"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "md-to-pdf",
+    "shortDescription": "Convert Markdown and Mermaid to PDF",
+    "longDescription": "Convert local Markdown files, including Mermaid diagrams, into PDF documents through a browser-based renderer.",
+    "developerName": "MiguelElGallo",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://miguelelgallo.github.io/md-to-pdf/",
+    "defaultPrompt": "Convert this Markdown document to PDF."
+  },
+  "mcpServers": "./.mcp.json"
+}
