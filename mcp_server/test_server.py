@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from unittest import mock
 
 from mcp_server import server
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseAssetTests(unittest.TestCase):
@@ -103,9 +108,9 @@ class AutomaticInstallTests(unittest.TestCase):
                     return_value=(target, "tar.gz", "md-to-pdf"),
                 ),
                 mock.patch.object(server, "_download_file", side_effect=bad_download),
+                self.assertRaisesRegex(RuntimeError, "checksum verification failed"),
             ):
-                with self.assertRaisesRegex(RuntimeError, "checksum verification failed"):
-                    server._install_md_to_pdf()
+                server._install_md_to_pdf()
 
 
 class ToolInvocationTests(unittest.TestCase):
@@ -137,6 +142,58 @@ class ToolInvocationTests(unittest.TestCase):
         self.assertEqual(command.count("--browser"), 1)
         self.assertEqual(command[-2:], ["--", "input.md"])
         self.assertEqual(result["content"][0]["text"], "output.pdf")
+
+
+class PluginPackagingTests(unittest.TestCase):
+    def test_release_versions_match(self) -> None:
+        expected = server.SERVER_VERSION
+        cargo = tomllib.loads(
+            (REPOSITORY_ROOT / "Cargo.toml").read_text(encoding="utf-8")
+        )
+        manifests = [
+            REPOSITORY_ROOT / "plugin.json",
+            REPOSITORY_ROOT / "plugins/md-to-pdf/plugin.json",
+            REPOSITORY_ROOT / "plugins/md-to-pdf/.codex-plugin/plugin.json",
+        ]
+        marketplace = json.loads(
+            (REPOSITORY_ROOT / ".github/plugin/marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(cargo["package"]["version"], expected)
+        self.assertEqual(server.BINARY_VERSION, expected)
+        for manifest in manifests:
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertEqual(data["version"], expected, manifest)
+        self.assertEqual(marketplace["metadata"]["version"], expected)
+        self.assertEqual(marketplace["plugins"][0]["version"], expected)
+
+    def test_marketplace_server_runs_from_packaged_copy(self) -> None:
+        wrapper = REPOSITORY_ROOT / "plugins/md-to-pdf/mcp_server/server.py"
+        request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {},
+        }
+        completed = subprocess.run(
+            [sys.executable, str(wrapper)],
+            input=json.dumps(request) + "\n",
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        response = json.loads(completed.stdout)
+
+        self.assertEqual(response["result"]["serverInfo"]["name"], "md-to-pdf")
+        self.assertEqual(response["result"]["serverInfo"]["version"], server.SERVER_VERSION)
+
+    def test_marketplace_server_matches_canonical_server(self) -> None:
+        canonical = REPOSITORY_ROOT / "mcp_server/server.py"
+        packaged = REPOSITORY_ROOT / "plugins/md-to-pdf/mcp_server/server.py"
+
+        self.assertEqual(packaged.read_bytes(), canonical.read_bytes())
 
 
 if __name__ == "__main__":

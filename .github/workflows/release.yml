@@ -122,15 +122,23 @@ jobs:
           set -euo pipefail
           cargo_version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "md-to-pdf") | .version')
           plugin_version=$(jq -r '.version' plugin.json)
+          portable_plugin_version=$(jq -r '.version' plugins/md-to-pdf/plugin.json)
+          codex_plugin_version=$(jq -r '.version' plugins/md-to-pdf/.codex-plugin/plugin.json)
+          copilot_marketplace_version=$(jq -r '.metadata.version' .github/plugin/marketplace.json)
           server_version=$(sed -n 's/^SERVER_VERSION = "\([^"]*\)"/\1/p' mcp_server/server.py)
           binary_version=$(sed -n 's/^BINARY_VERSION = "\([^"]*\)"/\1/p' mcp_server/server.py)
+          packaged_server_version=$(sed -n 's/^SERVER_VERSION = "\([^"]*\)"/\1/p' plugins/md-to-pdf/mcp_server/server.py)
           expected="${{ needs.plan.outputs.version }}"
-          if [[ "$cargo_version" != "$expected" || "$plugin_version" != "$expected" || "$server_version" != "$expected" || "$binary_version" != "$expected" ]]; then
+          if [[ "$cargo_version" != "$expected" || "$plugin_version" != "$expected" || "$portable_plugin_version" != "$expected" || "$codex_plugin_version" != "$expected" || "$copilot_marketplace_version" != "$expected" || "$server_version" != "$expected" || "$binary_version" != "$expected" || "$packaged_server_version" != "$expected" ]]; then
             echo "Release versions do not match tag ${{ needs.plan.outputs.tag }}:"
             echo "  Cargo.toml: $cargo_version"
             echo "  plugin.json: $plugin_version"
+            echo "  portable plugin: $portable_plugin_version"
+            echo "  Codex plugin: $codex_plugin_version"
+            echo "  Copilot marketplace: $copilot_marketplace_version"
             echo "  MCP server: $server_version"
             echo "  downloaded binary: $binary_version"
+            echo "  packaged MCP server: $packaged_server_version"
             exit 1
           fi
 
@@ -392,9 +400,9 @@ jobs:
 
           ### Changed
 
-          - Added an Agent Plugins 1.0.0 package with a `convert_markdown_to_pdf` skill.
-          - Added a dependency-free Python MCP stdio server wrapping the CLI.
-          - Added concise Agent Plugin installation and usage instructions.
+          - Added repository marketplaces for one-command discovery in Codex CLI and GitHub Copilot CLI.
+          - Added the portable `md-to-pdf` marketplace package with its conversion skill and MCP configuration.
+          - Documented the equivalent marketplace add and plugin install commands for both clients.
 
           ### macOS trust status
 

@@ -9,6 +9,24 @@ Convert Markdown to PDF with Mermaid diagrams using Chrome, Chromium, or Edge.
 
 This repository is an [Agent Plugins 1.0.0](https://github.com/agentplugins/agent-plugins-spec)-compliant package.
 
+For Codex CLI, add the repository marketplace and install `md-to-pdf`:
+
+```sh
+codex plugin marketplace add MiguelElGallo/md-to-pdf
+codex plugin add md-to-pdf@md-to-pdf
+```
+
+For GitHub Copilot CLI, use the equivalent marketplace commands:
+
+```sh
+copilot plugin marketplace add MiguelElGallo/md-to-pdf
+copilot plugin install md-to-pdf@md-to-pdf
+```
+
+Start a new Codex or Copilot session after installation so the plugin's skill and MCP tool are available.
+
+### VS Code
+
 1. Install Python 3 and Chrome, Chromium, or Edge.
 2. In VS Code, run **Chat: Install Plugin From Source** from the Command Palette.
 3. Enter `https://github.com/MiguelElGallo/md-to-pdf`.
