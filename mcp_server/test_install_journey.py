@@ -105,7 +105,7 @@ class InstallJourneyTests(unittest.TestCase):
         browser = _browser_path()
 
         with tempfile.TemporaryDirectory(prefix="md-to-pdf-journey-") as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             plugin = root / "isolated-plugin"
             shutil.copytree(REPOSITORY_ROOT / "plugins/md-to-pdf", plugin)
             server = _load_packaged_server(plugin)
