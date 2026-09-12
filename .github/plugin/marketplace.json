@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Install the md-to-pdf Markdown and Mermaid conversion plugin.",
-    "version": "0.2.2"
+    "version": "0.5.0"
   },
   "plugins": [
     {
       "name": "md-to-pdf",
       "description": "Convert Markdown files with Mermaid diagrams to PDF using a browser renderer.",
-      "version": "0.2.2",
+      "version": "0.5.0",
       "source": "./plugins/md-to-pdf"
     }
   ]
