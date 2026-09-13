@@ -5,42 +5,78 @@
 
 Convert Markdown to PDF with Mermaid diagrams using Chrome, Chromium, or Edge.
 
-## Install as an Agent Plugin
+## Install the agent plugin
 
-This repository is an [Agent Plugins 1.0.0](https://github.com/agentplugins/agent-plugins-spec)-compliant package.
+The plugin bundles a conversion skill and an MCP tool. You do not need Rust, a Python package install, or a separate `md-to-pdf` CLI installation.
 
-For Codex CLI, add the repository marketplace and install `md-to-pdf`:
+### Before you start
+
+- Install Chrome, Chromium, or Microsoft Edge.
+- Install **Python 3.11 or newer**, available as `python3` in the environment that launches your agent. Check with `python3 --version`. On Windows, `python` or `py` alone is not enough for the plugin's launcher; see [troubleshooting](docs/how-to/install.md#troubleshooting).
+- Use a Codex or Copilot client with plugin support and Git available for marketplace installation.
+- Allow access to GitHub Releases on the first conversion. Mermaid diagrams use a CDN by default; [offline rendering](docs/how-to/install.md#offline-use) is also supported.
+
+Automatic binary installation supports macOS Apple Silicon/Intel, Linux x86_64, and Windows x86_64. Other platforms require a compatible binary supplied through `MD_TO_PDF_BIN`.
+
+### Codex CLI
 
 ```sh
 codex plugin marketplace add MiguelElGallo/md-to-pdf
 codex plugin add md-to-pdf@md-to-pdf
 ```
 
-For GitHub Copilot CLI, use the equivalent marketplace commands:
+### GitHub Copilot CLI
 
 ```sh
 copilot plugin marketplace add MiguelElGallo/md-to-pdf
 copilot plugin install md-to-pdf@md-to-pdf
 ```
 
-Start a new Codex or Copilot session after installation so the plugin's skill and MCP tool are available.
+### First conversion
+
+Start a **new session** after installation, open the folder containing your Markdown file, and ask:
+
+> Convert report.md to a PDF using md-to-pdf and give me a link to the result.
+
+The skill checks the source and output paths, calls the converter, and returns the PDF. The first conversion downloads the plugin's version-matched release binary, verifies its SHA-256 checksum, and caches it. Later conversions reuse that cache. No administrator access is required for this download.
+
+Confirm that the PDF opens and its text and diagrams are present. For a different layout, ask: “Convert report.md to a Letter-sized PDF using print.css.”
+
+### Update or uninstall
+
+Update Codex's marketplace snapshot, then install the current plugin version:
+
+```sh
+codex plugin marketplace upgrade md-to-pdf
+codex plugin add md-to-pdf@md-to-pdf
+```
+
+Update Copilot's marketplace and plugin:
+
+```sh
+copilot plugin marketplace update md-to-pdf
+copilot plugin update md-to-pdf
+```
+
+Start a new session after updating. By default, the plugin selects its matching binary even if an older CLI is on your `PATH`. An explicit `MD_TO_PDF_BIN` override remains your responsibility to update.
+
+To uninstall, run the command for your client:
+
+```sh
+codex plugin remove md-to-pdf@md-to-pdf
+# Or, for Copilot:
+copilot plugin uninstall md-to-pdf
+```
+
+Your Markdown and generated PDFs are not removed. See the [installation guide](docs/how-to/install.md) for verification, marketplace removal, skill-only setup, and troubleshooting. The Codex commands are checked against `codex-cli 0.153.4`; Copilot's commands are covered in its [plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference).
 
 ### VS Code
 
-1. Install Python 3 and Chrome, Chromium, or Edge.
-2. In VS Code, run **Chat: Install Plugin From Source** from the Command Palette.
-3. Enter `https://github.com/MiguelElGallo/md-to-pdf`.
+In a VS Code version supporting agent plugins, run **Chat: Install Plugin From Source** from the Command Palette and enter `https://github.com/MiguelElGallo/md-to-pdf`. Start a new chat and use the same first-conversion prompt above. The same Python and browser requirements apply.
 
-VS Code clones and enables the plugin. On the first conversion, its dependency-free
-Python MCP server downloads a compatible `md-to-pdf` release binary, verifies its
-SHA-256 checksum, and caches it in the plugin's persistent data directory. No
-administrator access or separate CLI installation is required.
+### MCP options
 
-### MCP tool
-
-`convert_markdown_to_pdf` requires `input` and supports `output`, `title`, `page_size`, `css`, `mermaid_url`, `allow_html`, `allow_local_files`, and `browser`.
-
-Example arguments:
+The `convert_markdown_to_pdf` tool accepts absolute file paths:
 
 ```json
 {
@@ -50,40 +86,26 @@ Example arguments:
 }
 ```
 
-Set `MD_TO_PDF_BIN` to use an existing binary or `MD_TO_PDF_BROWSER` to select a
-browser. Set `MD_TO_PDF_AUTO_INSTALL=0` to disable the automatic binary download.
+Optional settings include `title`, `css`, `browser`, `mermaid_js` (a local browser bundle), `mermaid_url` (an alternative ES-module URL), `virtual_time_budget_ms` (1–60000, default 10000), and `keep_html`. Use only one Mermaid source. Raw HTML and browser local-file access are disabled by default; enable `allow_html` or `allow_local_files` only for trusted content that needs them. See the [safety model](docs/explanation/safety-model.md).
 
-## Install the CLI
+Set `MD_TO_PDF_BROWSER` to select a browser. Set `MD_TO_PDF_BIN` to use a specific executable, or `MD_TO_PDF_AUTO_INSTALL=0` to disable downloads and use an installed CLI on `PATH`. These manual modes do not guarantee a version match.
 
-Download a release from [GitHub Releases](https://github.com/MiguelElGallo/md-to-pdf/releases/latest), or install on macOS:
+## Install and use the CLI
+
+The standalone CLI needs a browser, but not Python. Download an archive from [GitHub Releases](https://github.com/MiguelElGallo/md-to-pdf/releases/latest), or install on macOS:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | sh
 ```
 
-Build from source:
-
-```sh
-cargo install --git https://github.com/MiguelElGallo/md-to-pdf
-```
-
-## Use the CLI
+The macOS script installs to `/usr/local/bin` and requests administrator access. For manual, no-admin installation or building from source, see the [installation guide](docs/how-to/install.md).
 
 ```sh
 md-to-pdf document.md
+md-to-pdf document.md --output report.pdf --title "Report" --page-size Letter --css print.css
 ```
 
-The default output is `document.pdf`. Common options:
-
-```sh
-md-to-pdf document.md \
-  --output report.pdf \
-  --title "Report" \
-  --page-size Letter \
-  --css print.css
-```
-
-Mermaid fenced code blocks render automatically:
+The default output is `document.pdf`. Mermaid fenced code blocks render automatically:
 
 ````markdown
 ```mermaid
@@ -92,17 +114,12 @@ graph TD
 ```
 ````
 
-Use `md-to-pdf --help` for all options.
-
-## Requirements
-
-- Chrome, Chromium, or Microsoft Edge
-- Internet access for Mermaid by default; use `--mermaid-js` for offline rendering
-- Rust and Cargo only when building from source
+Use `md-to-pdf --help` for all options. Rust and Cargo are required only when building from source.
 
 ## Documentation
 
 - [Full documentation](https://miguelelgallo.github.io/md-to-pdf/)
+- [Install, update, and troubleshoot](docs/how-to/install.md)
 - [CLI reference](docs/reference/cli.md)
 - [Choose a browser](docs/how-to/choose-a-browser.md)
 - [Use Mermaid offline](docs/how-to/use-local-mermaid.md)
@@ -113,6 +130,7 @@ Use `md-to-pdf --help` for all options.
 ```sh
 cargo fmt --check
 cargo test
+python3 -m unittest discover -s mcp_server
 uv run --locked --group docs zensical build --clean --strict
 ```
 

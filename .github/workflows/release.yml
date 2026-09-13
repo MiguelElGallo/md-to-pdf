@@ -400,9 +400,16 @@ jobs:
 
           ### Changed
 
-          - Added repository marketplaces for one-command discovery in Codex CLI and GitHub Copilot CLI.
-          - Added the portable `md-to-pdf` marketplace package with its conversion skill and MCP configuration.
-          - Documented the equivalent marketplace add and plugin install commands for both clients.
+          - Fixed Windows patch-version cache collisions and made plugin upgrades select their version-matched binary instead of an older CLI on PATH.
+          - Added offline Mermaid bundles, retained HTML, and configurable rendering budgets to the MCP conversion tool.
+          - Reworked the conversion skill around first use, safe output selection, verification, troubleshooting, and an installed CLI fallback.
+          - Added common prerequisites and install, update, and uninstall guidance for Codex and Copilot.
+          - Added isolated install, conversion, and simulated upgrade tests on Linux, macOS, and Windows.
+          - Added strict MCP argument validation and PDF output verification; Windows now discovers standard Chrome and Edge installations.
+
+          ### Upgrade notes
+
+          The plugin now uses its managed, version-matched binary by default. Set `MD_TO_PDF_BIN` to deliberately use another executable, or `MD_TO_PDF_AUTO_INSTALL=0` to use an existing CLI on PATH without downloading. Python 3.11+ and Chrome, Chromium, or Edge are required.
 
           ### macOS trust status
 

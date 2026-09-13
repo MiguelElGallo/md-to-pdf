@@ -25,12 +25,12 @@ from typing import Any
 
 TOOL_NAME = "convert_markdown_to_pdf"
 SERVER_NAME = "md-to-pdf"
-SERVER_VERSION = "0.2.2"
-BINARY_VERSION = "0.2.2"
+SERVER_VERSION = "0.5.0"
+BINARY_VERSION = "0.5.0"
 PROTOCOL_VERSION = "2024-11-05"
 REPOSITORY = "MiguelElGallo/md-to-pdf"
 
-_TOOLS = [
+_TOOLS: list[dict[str, Any]] = [
     {
         "name": TOOL_NAME,
         "description": (
@@ -91,8 +91,25 @@ _TOOLS = [
                     "type": "string",
                     "description": "Mermaid ES module URL for rendering diagrams. Overrides the default CDN URL.",
                 },
+                "mermaid_js": {
+                    "type": "string",
+                    "description": "Trusted local Mermaid browser bundle exposing window.mermaid. Conflicts with mermaid_url.",
+                },
+                "keep_html": {
+                    "type": "boolean",
+                    "description": "Keep generated HTML next to the PDF for debugging. May contain document content.",
+                    "default": False,
+                },
+                "virtual_time_budget_ms": {
+                    "type": "integer",
+                    "description": "Rendering wait budget in milliseconds, from 1 to 60000.",
+                    "minimum": 1,
+                    "maximum": 60000,
+                    "default": 10000,
+                },
             },
             "required": ["input"],
+            "additionalProperties": False,
         },
     }
 ]
@@ -135,7 +152,9 @@ def _plugin_data_dir() -> Path:
 
 
 def _download_file(url: str, destination: Path) -> None:
-    request = urllib.request.Request(url, headers={"User-Agent": "md-to-pdf-agent-plugin"})
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "md-to-pdf-agent-plugin"}
+    )
     with (
         urllib.request.urlopen(request, timeout=60) as response,
         destination.open("wb") as output,
@@ -185,7 +204,7 @@ def _install_md_to_pdf() -> str:
     install_dir = _plugin_data_dir() / "bin"
     installed_binary = install_dir / f"md-to-pdf-{tag}-{target}"
     if executable_name.endswith(".exe"):
-        installed_binary = installed_binary.with_suffix(".exe")
+        installed_binary = installed_binary.with_name(installed_binary.name + ".exe")
     if installed_binary.is_file():
         return str(installed_binary)
 
@@ -212,26 +231,13 @@ def _install_md_to_pdf() -> str:
 
 
 def _find_md_to_pdf() -> str:
-    """Locate the md-to-pdf executable."""
+    """Use the pinned managed release unless the user opts into an external CLI."""
     # 1. Explicit env var override
     env_val = os.environ.get("MD_TO_PDF_BIN")
     if env_val:
         return env_val
 
-    # 2. Sibling to this script (installed next to it)
-    script_dir = Path(__file__).parent
-    for candidate in [
-        script_dir.parent / "target" / "release" / "md-to-pdf",
-        script_dir.parent / "target" / "debug" / "md-to-pdf",
-    ]:
-        if candidate.is_file():
-            return str(candidate)
-
-    # 3. PATH
-    found = shutil.which("md-to-pdf")
-    if found:
-        return found
-
+    # A stale PATH or development build must not silently override an upgrade.
     if os.environ.get("MD_TO_PDF_AUTO_INSTALL", "1").lower() not in {
         "0",
         "false",
@@ -241,9 +247,13 @@ def _find_md_to_pdf() -> str:
             return _install_md_to_pdf()
         except Exception as exc:
             raise RuntimeError(
-                "md-to-pdf binary was not found and automatic installation failed: "
+                "md-to-pdf automatic installation failed: "
                 f"{exc}. Install it manually or set MD_TO_PDF_BIN."
             ) from exc
+
+    found = shutil.which("md-to-pdf")
+    if found:
+        return found
 
     raise FileNotFoundError(
         "md-to-pdf binary not found and automatic installation is disabled. "
@@ -261,9 +271,16 @@ def _str_arg(value: Any, default: str = "") -> str:
 
 def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """Invoke md-to-pdf with the given arguments and return a result dict."""
+    try:
+        _validate_arguments(arguments)
+    except (TypeError, ValueError, OSError) as exc:
+        return {"isError": True, "content": [{"type": "text", "text": str(exc)}]}
     input_path = _str_arg(arguments.get("input"))
     if not input_path:
-        return {"isError": True, "content": [{"type": "text", "text": "Missing required argument: input"}]}
+        return {
+            "isError": True,
+            "content": [{"type": "text", "text": "Missing required argument: input"}],
+        }
 
     try:
         binary = _find_md_to_pdf()
@@ -299,6 +316,15 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     if mermaid_url := _str_arg(arguments.get("mermaid_url")):
         cmd.extend(["--mermaid-url", mermaid_url])
 
+    if mermaid_js := _str_arg(arguments.get("mermaid_js")):
+        cmd.extend(["--mermaid-js", mermaid_js])
+
+    if arguments.get("keep_html"):
+        cmd.append("--keep-html")
+
+    if budget := arguments.get("virtual_time_budget_ms"):
+        cmd.extend(["--virtual-time-budget", str(budget)])
+
     # Emit -- before the positional to prevent a leading-dash input value
     # from being parsed as a flag by clap.
     cmd.extend(["--", input_path])
@@ -311,34 +337,81 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             timeout=120,
             check=False,
         )
-    except FileNotFoundError as exc:
+    except OSError as exc:
         return {
             "isError": True,
-            "content": [{"type": "text", "text": f"md-to-pdf binary not found: {exc}"}],
+            "content": [{"type": "text", "text": f"Could not start md-to-pdf: {exc}"}],
         }
     except subprocess.TimeoutExpired:
         return {
             "isError": True,
-            "content": [{"type": "text", "text": "md-to-pdf timed out after 120 seconds."}],
+            "content": [
+                {"type": "text", "text": "md-to-pdf timed out after 120 seconds."}
+            ],
         }
 
     if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
+        detail = (
+            result.stderr.strip()
+            or result.stdout.strip()
+            or f"exit code {result.returncode}"
+        )
         return {
             "isError": True,
             "content": [{"type": "text", "text": f"md-to-pdf failed:\n{detail}"}],
         }
 
-    # Normalize output: if the CLI printed "Wrote <path>", extract just the path.
-    stdout = result.stdout.strip()
-    match = re.match(r"^Wrote (.+)$", stdout)
-    output_msg = match.group(1) if match else (stdout or "Conversion complete.")
+    # Return the actual artifact, not arbitrary subprocess output.
+    output_path = (
+        Path(_str_arg(arguments.get("output")))
+        if arguments.get("output")
+        else Path(input_path).with_suffix(".pdf")
+    )
+    try:
+        with output_path.open("rb") as pdf:
+            if pdf.read(5) != b"%PDF-":
+                raise ValueError("output does not have a PDF header")
+        output_msg = str(output_path.resolve(strict=True))
+    except (OSError, ValueError) as exc:
+        return {
+            "isError": True,
+            "content": [
+                {"type": "text", "text": f"Could not verify generated PDF: {exc}"}
+            ],
+        }
     return {"content": [{"type": "text", "text": output_msg}]}
+
+
+def _validate_arguments(arguments: dict[str, Any]) -> None:
+    """Reject malformed flags and missing local inputs before downloading anything."""
+    if not isinstance(arguments, dict):
+        raise TypeError("Tool arguments must be an object")
+    properties = _TOOLS[0]["inputSchema"]["properties"]
+    for name, value in arguments.items():
+        if name not in properties:
+            raise ValueError(f"Unknown argument: {name}")
+        kind = properties[name]["type"]
+        if kind == "boolean" and not isinstance(value, bool):
+            raise ValueError(f"{name} must be a boolean")
+        if kind == "string" and (not isinstance(value, str) or not value.strip()):
+            raise ValueError(f"{name} must be a non-empty string")
+        if kind == "integer" and (type(value) is not int or not 1 <= value <= 60000):
+            raise ValueError(f"{name} must be an integer from 1 to 60000")
+    if "input" not in arguments:
+        raise ValueError("Missing required argument: input")
+    if arguments.get("mermaid_url") and arguments.get("mermaid_js"):
+        raise ValueError("Use mermaid_js or mermaid_url, not both")
+    for name in ("input", "css", "mermaid_js"):
+        if name in arguments and not Path(arguments[name].strip()).is_file():
+            raise ValueError(
+                f"{name} file does not exist or is not a regular file: {arguments[name]}"
+            )
 
 
 # ---------------------------------------------------------------------------
 # JSON-RPC / MCP stdio transport
 # ---------------------------------------------------------------------------
+
 
 def _send(response: dict[str, Any]) -> None:
     line = json.dumps(response, ensure_ascii=False)
@@ -409,7 +482,9 @@ def main() -> None:
             continue
 
         if not isinstance(request, dict):
-            _send(_error_response(None, -32600, "Invalid Request: expected a JSON object"))
+            _send(
+                _error_response(None, -32600, "Invalid Request: expected a JSON object")
+            )
             continue
 
         try:

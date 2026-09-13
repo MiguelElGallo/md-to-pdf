@@ -14,7 +14,9 @@ Run the command without `--browser`:
 md-to-pdf fixtures/basic.md
 ```
 
-The CLI looks for Chrome, Chromium, and Microsoft Edge command names on `PATH`, then checks common macOS application paths.
+The CLI first looks for Chrome, Chromium, and Microsoft Edge command names on `PATH`. It then checks common macOS application paths and standard Windows installation folders.
+
+On Windows, it searches `ProgramFiles`, `ProgramFiles(x86)`, and `LOCALAPPDATA`, in that order. Within each folder, it checks the usual Chrome, Edge, and Chromium executable locations. These installations do not need to be on `PATH`; see [Browser discovery](../reference/configuration.md#browser-discovery) for the exact paths.
 
 ## Set a browser path for one command
 
@@ -31,7 +33,7 @@ Replace the path with the browser executable on your system:
 | --- | --- |
 | macOS Edge | `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge` |
 | Linux Chrome | `/usr/bin/google-chrome` |
-| Windows Chrome | `C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe` |
+| Windows Chrome | `C:\Program Files\Google\Chrome\Application\chrome.exe` |
 
 ## Set a browser path for a shell session
 

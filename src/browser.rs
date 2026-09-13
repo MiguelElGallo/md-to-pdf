@@ -373,6 +373,25 @@ pub fn discover_browser() -> Result<Utf8PathBuf> {
         }
     }
 
+    // Standard Windows browser installs normally are not added to PATH.
+    #[cfg(target_os = "windows")]
+    for root in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
+        if let Some(directory) = std::env::var_os(root) {
+            for relative in [
+                "Google/Chrome/Application/chrome.exe",
+                "Microsoft/Edge/Application/msedge.exe",
+                "Chromium/Application/chrome.exe",
+            ] {
+                let candidate = std::path::PathBuf::from(&directory).join(relative);
+                if candidate.is_file() {
+                    return Utf8PathBuf::from_path_buf(candidate).map_err(|path| {
+                        anyhow!("browser path is not valid UTF-8: {}", path.display())
+                    });
+                }
+            }
+        }
+    }
+
     bail!("could not find Chrome, Chromium, or Edge; pass --browser or set MD_TO_PDF_BROWSER")
 }
 
