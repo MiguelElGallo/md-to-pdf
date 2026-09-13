@@ -77,14 +77,15 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
 
     @staticmethod
     def _run_planner(tag: str) -> tuple[subprocess.CompletedProcess[str], str]:
-        with tempfile.NamedTemporaryFile() as output:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "github-output"
             env = {
                 **os.environ,
                 "EVENT_NAME": "workflow_dispatch",
                 "INPUT_TAG": tag,
                 "INPUT_ALLOW_UNSIGNED_MACOS": "false",
                 "GITHUB_SHA": "a" * 40,
-                "GITHUB_OUTPUT": output.name,
+                "GITHUB_OUTPUT": str(output),
             }
             result = subprocess.run(
                 ["bash", "-c", ReleaseWorkflowSecurityTests._planner_script()],
@@ -94,8 +95,8 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
             )
-            output.seek(0)
-            return result, output.read().decode()
+            contents = output.read_text(encoding="utf-8") if output.exists() else ""
+            return result, contents
 
     @classmethod
     def _planner_script(cls) -> str:
