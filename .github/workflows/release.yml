@@ -505,7 +505,7 @@ jobs:
           - Blocked HTTP(S) assets referenced by Markdown, CSS, or raw HTML by default. Trusted documents can explicitly restore them with `--allow-remote-assets` or the matching MCP option; the built-in Mermaid CDN remains available.
           - Removed workflow-dispatch command injection from the release planner by validating tag input before any signing secret is available.
           - Pinned every release action to an immutable commit and isolated macOS signing/notarization onto fresh runners after secret-free builds.
-          - Added browser-level SSRF regression tests, release-workflow structure tests, and macOS Gatekeeper verification.
+          - Added browser-level SSRF regression tests, release-workflow structure tests, and macOS code-signing and notarization verification.
 
           ### Upgrade notes
 
