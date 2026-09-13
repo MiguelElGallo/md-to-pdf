@@ -191,10 +191,10 @@ In PowerShell, from the download folder:
 $version = "v0.5.0" # use the tag you downloaded
 $archive = ".\md-to-pdf-$version-x86_64-pc-windows-msvc.zip"
 $checksum = ".\md-to-pdf-$version-x86_64-pc-windows-msvc.sha256"
-$expected = ((Get-Content $checksum -Raw).Trim() -split '\s+')[0]
-$actual = (Get-FileHash $archive -Algorithm SHA256).Hash
+$expected = ((Get-Content $checksum -Raw -ErrorAction Stop).Trim() -split '\s+')[0]
+$actual = (Get-FileHash $archive -Algorithm SHA256 -ErrorAction Stop).Hash
 if ($actual -ne $expected) { throw "Checksum mismatch; do not run this archive." }
-Expand-Archive $archive -DestinationPath .
+Expand-Archive $archive -DestinationPath . -ErrorAction Stop
 .\md-to-pdf-$version-x86_64-pc-windows-msvc\md-to-pdf.exe --version
 ```
 

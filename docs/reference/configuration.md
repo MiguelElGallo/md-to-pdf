@@ -20,7 +20,9 @@ Browser selection uses this precedence:
 2. `MD_TO_PDF_BROWSER`
 3. automatic discovery
 
-Automatic discovery checks common Chrome, Chromium, and Edge command names, then common macOS application paths.
+Automatic discovery first checks common Chrome, Chromium, and Edge command names on `PATH`. It then checks common macOS application paths and, on Windows, standard installation folders under `ProgramFiles`, `ProgramFiles(x86)`, and `LOCALAPPDATA`.
+
+Within each Windows folder, discovery checks `Google/Chrome/Application/chrome.exe`, `Microsoft/Edge/Application/msedge.exe`, and `Chromium/Application/chrome.exe` in that order. A browser installed in one of these locations does not need to be on `PATH`.
 
 On systems where discovery fails, pass `--browser` or set `MD_TO_PDF_BROWSER`.
 

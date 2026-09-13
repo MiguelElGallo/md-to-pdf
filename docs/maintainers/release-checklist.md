@@ -13,7 +13,7 @@ Before publishing a release:
 - Run `ruff check mcp_server plugins/md-to-pdf/mcp_server` and `ty check mcp_server plugins/md-to-pdf/mcp_server`.
 - Confirm the packaged server and skill match their canonical copies (covered by packaging tests).
 - Build the CLI, then run `MD_TO_PDF_RUN_INSTALL_JOURNEY=1 MD_TO_PDF_JOURNEY_BINARY=target/debug/md-to-pdf python3 -m unittest mcp_server.test_install_journey -v` (use `.exe` on Windows and your shell's environment-variable syntax). This exercises isolated installation, three actual conversions, and a simulated patch upgrade from local release-format fixtures.
-- Confirm the install journey passes on Linux, macOS, and Windows in CI. Simulated upgrade tests do not replace public release read-back.
+- Confirm the install journey and the shipped `python3` manifest-launcher stdio conversion pass on Linux, macOS, and Windows in CI. Simulated upgrade tests do not replace public release read-back.
 - Run browser smoke tests for plain Markdown, valid Mermaid, and invalid Mermaid.
 - Run `uv run --locked --group docs zensical build --clean --strict`.
 - Run `actionlint .github/workflows/ci.yml .github/workflows/release.yml .github/workflows/docs.yml`.
