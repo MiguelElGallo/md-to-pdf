@@ -41,6 +41,8 @@ copilot plugin install md-to-pdf@md-to-pdf
 
 In a version supporting agent plugins, open the Command Palette, choose **Chat: Install Plugin From Source**, and enter `https://github.com/MiguelElGallo/md-to-pdf`. Python and the browser must be available to VS Code as well.
 
+The repository's Copilot marketplace routes VS Code through a compatibility package because current VS Code releases do not provide the Agent Plugins 1.0 `PLUGIN_ROOT` runtime contract ([microsoft/vscode#335006](https://github.com/microsoft/vscode/issues/335006)). You do not need to configure an absolute plugin path.
+
 ### Make your first PDF
 
 Start a new session or chat after installation. Open a folder containing a Markdown file and ask:
@@ -132,6 +134,7 @@ Do not combine `mermaid_js` with `mermaid_url`. A local bundle avoids the Mermai
 | --- | --- |
 | `plugin` command is unknown | Update your agent client to a version with plugin support. Check its `plugin --help` output. |
 | Skill or tool is missing | Confirm installation with the client's plugin listing, then start a new session. Installing only a skill does not register MCP. |
+| VS Code reports a path containing literal `${PLUGIN_ROOT}` | Update or reinstall this repository's plugin, then start a new chat. The Copilot marketplace package avoids VS Code's open Agent Plugins runtime bug; do not replace the token with a machine-specific absolute path. |
 | MCP fails to launch / `python3` not found | Run `python3 --version` from the agent's launch environment. On Windows, configure your Python installation to expose a real `python3` command, or set the client's MCP launcher override to the installed Python executable if supported. A shell alias in a different terminal is not enough. Restart the client. |
 | Browser not found | Install Chrome, Chromium, or Edge, or pass its executable path as the tool's `browser` option. `MD_TO_PDF_BROWSER` is the environment equivalent; see [Choose a browser](choose-a-browser.md). |
 | Download fails or platform is unsupported | Check GitHub Releases access. Supply a compatible, verified executable through `MD_TO_PDF_BIN` when automatic installation is unavailable. |

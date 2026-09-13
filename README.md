@@ -74,6 +74,8 @@ Your Markdown and generated PDFs are not removed. See the [installation guide](d
 
 In a VS Code version supporting agent plugins, run **Chat: Install Plugin From Source** from the Command Palette and enter `https://github.com/MiguelElGallo/md-to-pdf`. Start a new chat and use the same first-conversion prompt above. The same Python and browser requirements apply.
 
+The repository includes a Copilot-compatible package for VS Code while [microsoft/vscode#335006](https://github.com/microsoft/vscode/issues/335006) remains open. You should not replace `${PLUGIN_ROOT}` with an absolute local path.
+
 ### MCP options
 
 The `convert_markdown_to_pdf` tool accepts absolute file paths:

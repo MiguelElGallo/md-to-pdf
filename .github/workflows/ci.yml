@@ -165,8 +165,8 @@ jobs:
         uses: astral-sh/setup-uv@v8.3.2
       - name: Check Python lint and types
         run: |
-          uvx ruff==0.16.6 check mcp_server plugins/md-to-pdf/mcp_server
-          uvx ty==0.0.78 check mcp_server plugins/md-to-pdf/mcp_server
+          uvx ruff==0.16.6 check mcp_server plugins/md-to-pdf/mcp_server plugins/md-to-pdf-copilot/mcp_server
+          uvx ty==0.0.78 check mcp_server plugins/md-to-pdf/mcp_server plugins/md-to-pdf-copilot/mcp_server
 
   docs:
     name: Documentation

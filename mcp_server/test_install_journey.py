@@ -120,7 +120,7 @@ class InstallJourneyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="md-to-pdf-launcher-") as directory:
             root = Path(directory).resolve()
             plugin = root / "isolated-plugin"
-            shutil.copytree(REPOSITORY_ROOT / "plugins/md-to-pdf", plugin)
+            shutil.copytree(REPOSITORY_ROOT / "plugins/md-to-pdf-copilot", plugin)
             manifest = json.loads((plugin / ".mcp.json").read_text(encoding="utf-8"))
             configuration = manifest["mcpServers"]["md-to-pdf"]
             command = [

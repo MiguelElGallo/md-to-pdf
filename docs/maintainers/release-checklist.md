@@ -10,8 +10,9 @@ Before publishing a release:
 - Run `cargo clippy --locked --all-targets -- -D warnings`.
 - Run `cargo test --locked`.
 - Run `python3 -m unittest discover -s mcp_server -p 'test_*.py'`.
-- Run `ruff check mcp_server plugins/md-to-pdf/mcp_server` and `ty check mcp_server plugins/md-to-pdf/mcp_server`.
+- Run `ruff check mcp_server plugins/md-to-pdf/mcp_server plugins/md-to-pdf-copilot/mcp_server` and `ty check mcp_server plugins/md-to-pdf/mcp_server plugins/md-to-pdf-copilot/mcp_server`.
 - Confirm the packaged server and skill match their canonical copies (covered by packaging tests).
+- Confirm `.github/plugin/marketplace.json` points to the legacy `plugins/md-to-pdf-copilot` package. VS Code currently needs that package because its Agent Plugins 1.0 runtime does not expand or inject `PLUGIN_ROOT` ([microsoft/vscode#335006](https://github.com/microsoft/vscode/issues/335006)). Keep the canonical package for conforming Agent Plugins clients.
 - Build the CLI, then run `MD_TO_PDF_RUN_INSTALL_JOURNEY=1 MD_TO_PDF_JOURNEY_BINARY=target/debug/md-to-pdf python3 -m unittest mcp_server.test_install_journey -v` (use `.exe` on Windows and your shell's environment-variable syntax). This exercises isolated installation, three actual conversions, and a simulated patch upgrade from local release-format fixtures.
 - Confirm the install journey and the shipped `python3` manifest-launcher stdio conversion pass on Linux, macOS, and Windows in CI. Simulated upgrade tests do not replace public release read-back.
 - Run browser smoke tests for plain Markdown, valid Mermaid, and invalid Mermaid.
