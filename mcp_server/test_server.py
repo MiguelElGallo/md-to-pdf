@@ -321,6 +321,7 @@ class PluginPackagingTests(unittest.TestCase):
             REPOSITORY_ROOT / "plugin.json",
             REPOSITORY_ROOT / "plugins/md-to-pdf/plugin.json",
             REPOSITORY_ROOT / "plugins/md-to-pdf/.codex-plugin/plugin.json",
+            REPOSITORY_ROOT / "plugins/md-to-pdf-copilot/plugin.json",
         ]
         marketplace = json.loads(
             (REPOSITORY_ROOT / ".github/plugin/marketplace.json").read_text(
@@ -335,6 +336,26 @@ class PluginPackagingTests(unittest.TestCase):
             self.assertEqual(data["version"], expected, manifest)
         self.assertEqual(marketplace["metadata"]["version"], expected)
         self.assertEqual(marketplace["plugins"][0]["version"], expected)
+
+    def test_copilot_marketplace_uses_legacy_runtime_package(self) -> None:
+        """Keep VS Code off its broken Agent Plugins 1.0 MCP runtime path."""
+        marketplace = json.loads(
+            (REPOSITORY_ROOT / ".github/plugin/marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        package = REPOSITORY_ROOT / "plugins/md-to-pdf-copilot"
+        manifest = json.loads((package / "plugin.json").read_text(encoding="utf-8"))
+        mcp = json.loads((package / ".mcp.json").read_text(encoding="utf-8"))
+        configuration = mcp["mcpServers"]["md-to-pdf"]
+
+        self.assertEqual(
+            marketplace["plugins"][0]["source"], "./plugins/md-to-pdf-copilot"
+        )
+        self.assertNotIn("$schema", manifest)
+        self.assertEqual(manifest["mcpServers"], "./.mcp.json")
+        self.assertEqual(configuration["command"], "python3")
+        self.assertEqual(configuration["args"], ["${PLUGIN_ROOT}/mcp_server/server.py"])
 
     def test_marketplace_server_runs_from_packaged_copy(self) -> None:
         wrapper = REPOSITORY_ROOT / "plugins/md-to-pdf/mcp_server/server.py"
@@ -360,16 +381,18 @@ class PluginPackagingTests(unittest.TestCase):
 
     def test_marketplace_server_matches_canonical_server(self) -> None:
         canonical = REPOSITORY_ROOT / "mcp_server/server.py"
-        packaged = REPOSITORY_ROOT / "plugins/md-to-pdf/mcp_server/server.py"
-
-        self.assertEqual(packaged.read_bytes(), canonical.read_bytes())
+        for package in ("md-to-pdf", "md-to-pdf-copilot"):
+            packaged = REPOSITORY_ROOT / "plugins" / package / "mcp_server/server.py"
+            self.assertEqual(packaged.read_bytes(), canonical.read_bytes(), package)
 
     def test_marketplace_skill_matches_canonical_skill(self) -> None:
         relative = "skills/convert-to-pdf/SKILL.md"
-        self.assertEqual(
-            (REPOSITORY_ROOT / relative).read_bytes(),
-            (REPOSITORY_ROOT / "plugins/md-to-pdf" / relative).read_bytes(),
-        )
+        for package in ("md-to-pdf", "md-to-pdf-copilot"):
+            self.assertEqual(
+                (REPOSITORY_ROOT / relative).read_bytes(),
+                (REPOSITORY_ROOT / "plugins" / package / relative).read_bytes(),
+                package,
+            )
 
 
 if __name__ == "__main__":
