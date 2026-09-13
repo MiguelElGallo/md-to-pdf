@@ -251,14 +251,21 @@ fn set_socket_timeout(stream: &MaybeTlsStream<TcpStream>, timeout: Duration) -> 
 fn wait_for_mermaid(client: &mut CdpClient, timeout: Duration) -> Result<()> {
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
-        let value = evaluate_json(
+        let value = match evaluate_json(
             client,
             r#"(() => ({
   readyState: document.readyState,
   status: document.documentElement.dataset.mermaidStatus || "missing",
   error: window.__MD_TO_PDF_ERROR || ""
 }))()"#,
-        )?;
+        ) {
+            Ok(value) => value,
+            Err(error) if error.to_string().contains("did not return a value") => {
+                thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
         let ready_state = value
             .get("readyState")
             .and_then(Value::as_str)

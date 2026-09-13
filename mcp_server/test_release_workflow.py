@@ -47,6 +47,7 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
         self.assertNotIn("${{ inputs.", planner[planner.index("        run: |") :])
         self.assertLess(self.workflow.index(planner), self.workflow.index(signing))
 
+    @unittest.skipIf(os.name == "nt", "the release planner runs on Ubuntu")
     def test_planner_accepts_supported_release_modes(self) -> None:
         cases = {
             "dry-run": ("dry-run", "false"),
@@ -60,6 +61,7 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
                 self.assertIn(f"version={version}\n", output)
                 self.assertIn(f"publishing={publishing}\n", output)
 
+    @unittest.skipIf(os.name == "nt", "the release planner runs on Ubuntu")
     def test_planner_rejects_shell_payloads_without_executing_them(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             marker = Path(directory) / "executed"
