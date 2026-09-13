@@ -95,7 +95,7 @@ The dry run should:
 - Import the Developer ID certificate into a temporary keychain.
 - Sign macOS binaries with hardened runtime and a secure timestamp.
 - Submit macOS zip archives to Apple's notary service.
-- Verify the extracted signed binary with `codesign` and `spctl`.
+- Verify the extracted signed binary with `codesign`; the successful `notarytool --wait` result is the notarization gate. `spctl --type execute` does not treat this standalone CLI as an app bundle and reports “does not seem to be an app,” even after Apple accepts its ZIP.
 - Produce checksums and artifact attestations.
 
 Do not publish a signed macOS release until the dry run passes.
