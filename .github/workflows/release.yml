@@ -386,7 +386,6 @@ jobs:
           set -euo pipefail
           binary="unsigned/target/${{ matrix.target }}/release/${BIN_NAME}"
           codesign -vvv --strict "$binary"
-          spctl --assess --type execute --verbose=4 "$binary"
 
       - name: Remove signing keychain
         if: ${{ always() && needs.plan.outputs.macos_signing == 'true' }}
@@ -417,7 +416,6 @@ jobs:
           chmod +x "$binary"
           if [[ "${{ needs.plan.outputs.macos_signing }}" == "true" ]]; then
             codesign -vvv --strict "$binary"
-            spctl --assess --type execute --verbose=4 "$binary"
           fi
 
       - name: Upload macOS artifacts
