@@ -30,6 +30,8 @@ md-to-pdf fixtures/basic.md --css print.css
 
 The custom CSS is appended after the built-in print styles.
 
+Remote `url()` and `@import` resources are blocked by default. If a trusted stylesheet deliberately needs HTTP(S) assets, add `--allow-remote-assets`; this permits the document to contact private and local network services too. Prefer local assets with `--allow-local-files` when possible.
+
 You should see:
 
 ```text

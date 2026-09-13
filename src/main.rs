@@ -50,6 +50,10 @@ struct Cli {
     #[arg(long)]
     allow_local_files: bool,
 
+    /// Allow HTTP(S) assets referenced by Markdown, CSS, or trusted raw HTML. This permits requests to private and local networks.
+    #[arg(long)]
+    allow_remote_assets: bool,
+
     /// Browser virtual time budget in milliseconds for Mermaid and layout before PDF printing.
     #[arg(long, default_value_t = 10_000)]
     virtual_time_budget: u64,
@@ -95,6 +99,16 @@ fn run(cli: Cli) -> Result<()> {
         ),
         None => MermaidSource::EsModuleUrl(cli.mermaid_url.clone()),
     };
+    if !cli.allow_remote_assets
+        && matches!(
+            &mermaid_source,
+            MermaidSource::EsModuleUrl(url) if url != DEFAULT_MERMAID_URL
+        )
+    {
+        anyhow::bail!(
+            "a custom Mermaid URL requires --allow-remote-assets; use --mermaid-js for secure offline rendering"
+        );
+    }
     let base_href = input_base_href(&cli.input)?;
     let document = render_document(
         &body,
@@ -107,6 +121,7 @@ fn run(cli: Cli) -> Result<()> {
             page_size: cli.page_size.clone(),
             custom_css,
             mermaid_source,
+            allow_remote_assets: cli.allow_remote_assets,
         },
     );
 

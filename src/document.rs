@@ -16,6 +16,7 @@ pub struct DocumentOptions {
     pub page_size: String,
     pub custom_css: Option<String>,
     pub mermaid_source: MermaidSource,
+    pub allow_remote_assets: bool,
 }
 
 pub fn render_document(body: &str, options: &DocumentOptions) -> String {
@@ -38,6 +39,11 @@ pub fn render_document(body: &str, options: &DocumentOptions) -> String {
     } else {
         String::new()
     };
+    let content_security_policy = if options.allow_remote_assets {
+        "default-src 'none'; base-uri 'self'; img-src data: file: http: https:; style-src 'unsafe-inline' http: https:; font-src data: file: http: https:; media-src data: file: http: https:; script-src 'unsafe-inline' http: https:; connect-src http: https:; object-src 'none'; frame-src http: https:; worker-src blob: http: https:"
+    } else {
+        "default-src 'none'; base-uri 'self'; img-src data: file:; style-src 'unsafe-inline'; font-src data: file:; media-src data: file:; script-src 'unsafe-inline' https://cdn.jsdelivr.net; connect-src https://cdn.jsdelivr.net; object-src 'none'; frame-src 'none'; worker-src 'none'"
+    };
 
     format!(
         r#"<!doctype html>
@@ -45,6 +51,7 @@ pub fn render_document(body: &str, options: &DocumentOptions) -> String {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{content_security_policy}">
 {base}
 <title>{title}</title>
 <style>
@@ -189,12 +196,15 @@ mod tests {
                 page_size: "A4".to_string(),
                 custom_css: None,
                 mermaid_source: MermaidSource::EsModuleUrl(DEFAULT_MERMAID_URL.to_string()),
+                allow_remote_assets: false,
             },
         );
 
         assert!(html.contains("<base href=\"file:///tmp/docs/\">"));
         assert!(html.contains("data-mermaid-status=\"pending\""));
         assert!(html.contains(DEFAULT_MERMAID_URL));
+        assert!(html.contains("img-src data: file:"));
+        assert!(!html.contains("img-src data: file: http: https:"));
     }
 
     #[test]
@@ -207,10 +217,29 @@ mod tests {
                 page_size: "A4".to_string(),
                 custom_css: None,
                 mermaid_source: MermaidSource::EsModuleUrl(DEFAULT_MERMAID_URL.to_string()),
+                allow_remote_assets: false,
             },
         );
 
         assert!(html.contains("data-mermaid-status=\"ready\""));
         assert!(!html.contains(DEFAULT_MERMAID_URL));
+    }
+
+    #[test]
+    fn remote_assets_require_an_explicit_opt_in() {
+        let html = render_document(
+            r#"<img src="http://127.0.0.1/private">"#,
+            &DocumentOptions {
+                title: "Doc".to_string(),
+                base_href: None,
+                page_size: "A4".to_string(),
+                custom_css: Some("body { background: url(http://127.0.0.1/private); }".to_string()),
+                mermaid_source: MermaidSource::InlineScript(String::new()),
+                allow_remote_assets: true,
+            },
+        );
+
+        assert!(html.contains("img-src data: file: http: https:"));
+        assert!(html.contains("style-src 'unsafe-inline' http: https:"));
     }
 }

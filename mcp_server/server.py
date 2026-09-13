@@ -25,8 +25,8 @@ from typing import Any
 
 TOOL_NAME = "convert_markdown_to_pdf"
 SERVER_NAME = "md-to-pdf"
-SERVER_VERSION = "0.5.0"
-BINARY_VERSION = "0.5.0"
+SERVER_VERSION = "0.5.1"
+BINARY_VERSION = "0.5.1"
 PROTOCOL_VERSION = "2024-11-05"
 REPOSITORY = "MiguelElGallo/md-to-pdf"
 
@@ -73,6 +73,15 @@ _TOOLS: list[dict[str, Any]] = [
                     "description": (
                         "Allow Chrome to access local files for assets referenced "
                         "in Markdown. Defaults to false."
+                    ),
+                    "default": False,
+                },
+                "allow_remote_assets": {
+                    "type": "boolean",
+                    "description": (
+                        "Allow HTTP(S) assets referenced by Markdown, CSS, or trusted "
+                        "raw HTML. This permits requests to private and local networks. "
+                        "Defaults to false."
                     ),
                     "default": False,
                 },
@@ -306,6 +315,9 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
 
     if arguments.get("allow_local_files"):
         cmd.append("--allow-local-files")
+
+    if arguments.get("allow_remote_assets"):
+        cmd.append("--allow-remote-assets")
 
     if browser := _str_arg(arguments.get("browser")):
         cmd.extend(["--browser", browser])

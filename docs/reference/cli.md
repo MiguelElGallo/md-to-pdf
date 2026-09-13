@@ -28,6 +28,7 @@ md-to-pdf guide.md --mermaid-js ./vendor/mermaid.min.js # local Mermaid bundle
 | `--mermaid-js <PATH>` | None | Local Mermaid browser bundle that exposes `window.mermaid`. Conflicts with `--mermaid-url`. |
 | `--allow-html` | `false` | Let raw HTML in Markdown pass through. |
 | `--allow-local-files` | `false` | Pass Chrome's `--allow-file-access-from-files` flag. |
+| `--allow-remote-assets` | `false` | Allow HTTP(S) assets from Markdown, CSS, or trusted raw HTML. This can reach private and local networks. |
 | `--virtual-time-budget <MS>` | `10000` | Milliseconds to wait for page load and Mermaid rendering. |
 | `--keep-html` | `false` | Write generated HTML next to the PDF. |
 
