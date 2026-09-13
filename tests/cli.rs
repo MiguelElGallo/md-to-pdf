@@ -1,6 +1,10 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
+use std::io::{Read, Write};
+use std::net::TcpListener;
+use std::thread;
+use std::time::{Duration, Instant};
 use tempfile::tempdir;
 
 #[test]
@@ -12,6 +16,7 @@ fn help_includes_core_options() {
         .success()
         .stdout(predicate::str::contains("--output"))
         .stdout(predicate::str::contains("--mermaid-js"))
+        .stdout(predicate::str::contains("--allow-remote-assets"))
         .stdout(predicate::str::contains("--browser"));
 }
 
@@ -56,6 +61,24 @@ fn invalid_browser_path_fails_clearly() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("failed to start browser"));
+}
+
+#[test]
+fn custom_mermaid_url_requires_remote_asset_opt_in() {
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            "fixtures/mermaid-flowchart.md",
+            "--mermaid-url",
+            "https://example.com/mermaid.mjs",
+            "--browser",
+            "/definitely/not/a/browser",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "a custom Mermaid URL requires --allow-remote-assets",
+        ));
 }
 
 #[test]
@@ -232,6 +255,101 @@ fn browser_smoke_invalid_mermaid_fails() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("Mermaid render failed"));
+}
+
+#[test]
+fn browser_blocks_document_remote_requests_by_default() {
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser network test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}/private.png", listener.local_addr().unwrap());
+    let temp_dir = tempdir().unwrap();
+    let input = temp_dir.path().join("remote.md");
+    let css = temp_dir.path().join("remote.css");
+    let output = temp_dir.path().join("remote.pdf");
+    fs::write(&input, format!("# Remote assets\n\n![private]({url})\n")).unwrap();
+    fs::write(
+        &css,
+        format!("body {{ background-image: url('{url}'); }}\n"),
+    )
+    .unwrap();
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            input.to_str().unwrap(),
+            "--css",
+            css.to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+            "--browser",
+            &browser,
+        ])
+        .assert()
+        .success();
+
+    assert!(matches!(
+        listener.accept(),
+        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock
+    ));
+}
+
+#[test]
+fn browser_remote_asset_opt_in_preserves_network_images() {
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser network test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}/asset.png", listener.local_addr().unwrap());
+    let server = thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let mut request = [0_u8; 1024];
+                    let _ = stream.read(&mut request);
+                    stream
+                        .write_all(b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n")
+                        .unwrap();
+                    return true;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    if Instant::now() >= deadline {
+                        return false;
+                    }
+                    thread::sleep(Duration::from_millis(20));
+                }
+                Err(error) => panic!("asset server failed: {error}"),
+            }
+        }
+    });
+    let temp_dir = tempdir().unwrap();
+    let input = temp_dir.path().join("remote.md");
+    let output = temp_dir.path().join("remote.pdf");
+    fs::write(&input, format!("# Remote asset\n\n![remote]({url})\n")).unwrap();
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            input.to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+            "--allow-remote-assets",
+            "--browser",
+            &browser,
+        ])
+        .assert()
+        .success();
+
+    assert!(
+        server.join().unwrap(),
+        "browser did not request remote asset"
+    );
 }
 
 fn smoke_browser() -> Option<String> {

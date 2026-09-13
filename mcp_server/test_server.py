@@ -221,6 +221,7 @@ class ToolInvocationTests(unittest.TestCase):
             "input": str(self.input),
             "output": str(output),
             "allow_html": True,
+            "allow_remote_assets": True,
             "browser": "/browser",
             "mermaid_js": str(bundle),
             "keep_html": True,
@@ -234,6 +235,7 @@ class ToolInvocationTests(unittest.TestCase):
 
         command = run.call_args.args[0]
         self.assertEqual(command.count("--allow-html"), 1)
+        self.assertEqual(command.count("--allow-remote-assets"), 1)
         self.assertEqual(command.count("--browser"), 1)
         self.assertEqual(command.count("--mermaid-js"), 1)
         self.assertEqual(command.count("--keep-html"), 1)
@@ -245,6 +247,7 @@ class ToolInvocationTests(unittest.TestCase):
         cases = [
             {"allow_html": "false"},
             {"allow_local_files": 1},
+            {"allow_remote_assets": 1},
             {"keep_html": "true"},
             {"virtual_time_budget_ms": True},
             {"virtual_time_budget_ms": 0},
@@ -283,11 +286,13 @@ class ToolInvocationTests(unittest.TestCase):
                     "input": str(self.input),
                     "allow_html": False,
                     "allow_local_files": False,
+                    "allow_remote_assets": False,
                     "keep_html": False,
                 }
             )
         self.assertNotIn("--allow-html", run.call_args.args[0])
         self.assertNotIn("--allow-local-files", run.call_args.args[0])
+        self.assertNotIn("--allow-remote-assets", run.call_args.args[0])
         self.assertNotIn("--keep-html", run.call_args.args[0])
 
     def test_success_without_pdf_is_reported_as_error(self) -> None:

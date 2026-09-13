@@ -19,7 +19,7 @@ git --version
 
 These checks must work from the environment that starts your agent, not only from a different terminal. On Windows, a working `python` or `py` command alone does not satisfy the plugin's `python3` launcher.
 
-The first plugin conversion needs access to GitHub Releases to download a binary. Mermaid diagrams load a JavaScript library from a CDN by default; [offline use](#offline-use) requires a local bundle. Other remote document assets can also use the network.
+The first plugin conversion needs access to GitHub Releases to download a binary. Mermaid diagrams load a JavaScript library from a fixed CDN URL by default; [offline use](#offline-use) requires a local bundle. Other remote document assets are blocked unless `allow_remote_assets` is explicitly enabled for trusted content.
 
 ## Install the agent plugin
 
@@ -124,7 +124,7 @@ Ask the agent to convert using the local bundle. The MCP arguments are:
 }
 ```
 
-Do not combine `mermaid_js` with `mermaid_url`. A local bundle avoids the Mermaid CDN; it does not make remote images, fonts, or stylesheets available offline, or remove the agent client's own connectivity requirements. See [Use Mermaid offline](use-local-mermaid.md) for the CLI equivalent.
+Do not combine `mermaid_js` with `mermaid_url`. A local bundle avoids the Mermaid CDN. Remote images, fonts, and stylesheets remain blocked by default; `allow_remote_assets` restores them but also permits browser requests to private and local networks. See [Use Mermaid offline](use-local-mermaid.md) for the CLI equivalent.
 
 ## Troubleshooting
 
@@ -139,13 +139,13 @@ Do not combine `mermaid_js` with `mermaid_url`. A local bundle avoids the Mermai
 | Old CLI after an update | Restart the agent and check `MD_TO_PDF_BIN` and `MD_TO_PDF_AUTO_INSTALL`. A manually selected executable is not upgraded by the plugin. |
 | Mermaid diagrams are missing | Check syntax and CDN access, or use `mermaid_js`. For slow diagrams, increase `virtual_time_budget_ms` within 1–60000. Set `keep_html: true` when you need the generated HTML for diagnosis. |
 
-`keep_html` writes a sibling HTML file that can contain sensitive document content. Raw HTML and local-file browser access are disabled by default; do not enable `allow_html` or `allow_local_files` as a generic workaround. See the [safety model](../explanation/safety-model.md).
+`keep_html` writes a sibling HTML file that can contain sensitive document content. Raw HTML, local-file browser access, and remote document assets are disabled by default; do not enable `allow_html`, `allow_local_files`, or `allow_remote_assets` as a generic workaround. A custom `mermaid_url` requires `allow_remote_assets`; use `mermaid_js` to stay offline. See the [safety model](../explanation/safety-model.md).
 
 To disable automatic downloads, set `MD_TO_PDF_AUTO_INSTALL=0` before launching the agent. The server can then use `md-to-pdf` on `PATH`, without guaranteeing its version matches the plugin. An explicit `MD_TO_PDF_BIN` takes precedence in either mode. Use the client's supported environment configuration; do not edit cached plugin files, because an update can replace them.
 
 ## Install the standalone CLI
 
-Download the archive for your platform and its matching `.sha256` file from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest). The names below use `<tag>` for a release tag, such as `v0.5.0`.
+Download the archive for your platform and its matching `.sha256` file from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest). The names below use `<tag>` for a release tag, such as `v0.5.1`.
 
 | Platform | Archive |
 | --- | --- |
@@ -163,7 +163,7 @@ curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/script
 The script detects Apple Silicon or Intel, verifies the matching checksum, and installs to `/usr/local/bin` using administrator access. To pin a release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | MD_TO_PDF_VERSION=v0.5.0 sh
+curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | MD_TO_PDF_VERSION=v0.5.1 sh
 ```
 
 For a no-admin installation, verify and extract the matching release archive, then run the extracted binary directly or place it in a user-owned directory on `PATH`. Check the release notes for macOS signing and notarization status.
@@ -173,7 +173,7 @@ For a no-admin installation, verify and extract the matching release archive, th
 In the folder containing the downloaded archive and checksum:
 
 ```sh
-VERSION="v0.5.0" # use the tag you downloaded
+VERSION="v0.5.1" # use the tag you downloaded
 sha256sum -c "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu.sha256" && \
 tar -xzf "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu.tar.gz" && \
 mkdir -p "$HOME/.local/bin" && \
@@ -188,7 +188,7 @@ Add `$HOME/.local/bin` to your shell's `PATH` if it is not already present. The 
 In PowerShell, from the download folder:
 
 ```powershell
-$version = "v0.5.0" # use the tag you downloaded
+$version = "v0.5.1" # use the tag you downloaded
 $archive = ".\md-to-pdf-$version-x86_64-pc-windows-msvc.zip"
 $checksum = ".\md-to-pdf-$version-x86_64-pc-windows-msvc.sha256"
 $expected = ((Get-Content $checksum -Raw -ErrorAction Stop).Trim() -split '\s+')[0]
@@ -205,7 +205,7 @@ Run the executable by its full path, or put its directory on your user `PATH`. A
 With Rust and Cargo installed:
 
 ```sh
-cargo install --git https://github.com/MiguelElGallo/md-to-pdf --tag v0.5.0
+cargo install --git https://github.com/MiguelElGallo/md-to-pdf --tag v0.5.1
 md-to-pdf --version
 ```
 

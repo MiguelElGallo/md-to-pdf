@@ -86,7 +86,7 @@ The `convert_markdown_to_pdf` tool accepts absolute file paths:
 }
 ```
 
-Optional settings include `title`, `css`, `browser`, `mermaid_js` (a local browser bundle), `mermaid_url` (an alternative ES-module URL), `virtual_time_budget_ms` (1–60000, default 10000), and `keep_html`. Use only one Mermaid source. Raw HTML and browser local-file access are disabled by default; enable `allow_html` or `allow_local_files` only for trusted content that needs them. See the [safety model](docs/explanation/safety-model.md).
+Optional settings include `title`, `css`, `browser`, `mermaid_js` (a local browser bundle), `mermaid_url` (an alternative ES-module URL), `virtual_time_budget_ms` (1–60000, default 10000), and `keep_html`. Use only one Mermaid source. Raw HTML, browser local-file access, and remote document assets are disabled by default; enable `allow_html`, `allow_local_files`, or `allow_remote_assets` only for trusted content that needs them. The built-in Mermaid CDN remains available without the remote-asset opt-in. See the [safety model](docs/explanation/safety-model.md).
 
 Set `MD_TO_PDF_BROWSER` to select a browser. Set `MD_TO_PDF_BIN` to use a specific executable, or `MD_TO_PDF_AUTO_INSTALL=0` to disable downloads and use an installed CLI on `PATH`. These manual modes do not guarantee a version match.
 
