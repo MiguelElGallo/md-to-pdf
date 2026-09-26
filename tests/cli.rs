@@ -234,8 +234,12 @@ fn browser_smoke_headings_produce_outline_and_internal_links() {
         "PDF should include a document outline"
     );
     assert!(
-        contains(b"/Dest"),
-        "PDF should include internal link destinations"
+        contains(b"/Subtype /Link") && contains(b"/Dest /results"),
+        "the [results](#results) Markdown link should become an internal PDF link"
+    );
+    assert!(
+        contains(b"/StructTreeRoot"),
+        "PDF should be tagged with a structure tree"
     );
 }
 

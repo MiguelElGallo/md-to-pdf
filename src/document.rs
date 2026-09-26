@@ -3,9 +3,39 @@ use html_escape::{encode_double_quoted_attribute, encode_text};
 pub const DEFAULT_MERMAID_URL: &str =
     "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs";
 
-/// Accepts CSS `@page` size values such as `A4`, `Letter landscape`, or
-/// `210mm 297mm`, rejecting characters that could escape the CSS declaration.
-pub fn parse_page_size(value: &str) -> Result<String, String> {
+/// A validated CSS `@page` size such as `A4`, `Letter landscape`, or
+/// `210mm 297mm`. Construction rejects characters that could escape the CSS
+/// declaration, so every rendering entry point shares the same protection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PageSize(String);
+
+impl PageSize {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Default for PageSize {
+    fn default() -> Self {
+        Self("A4".to_string())
+    }
+}
+
+impl std::fmt::Display for PageSize {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::str::FromStr for PageSize {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        parse_page_size(value)
+    }
+}
+
+pub fn parse_page_size(value: &str) -> Result<PageSize, String> {
     let value = value.trim();
     if value.is_empty() {
         return Err("page size must not be empty".to_string());
@@ -19,7 +49,7 @@ pub fn parse_page_size(value: &str) -> Result<String, String> {
             "invalid page size {value:?}; use a CSS page size such as A4, Letter, \"A4 landscape\", or \"210mm 297mm\""
         ));
     }
-    Ok(value.to_string())
+    Ok(PageSize(value.to_string()))
 }
 
 #[derive(Debug, Clone)]
@@ -32,7 +62,7 @@ pub enum MermaidSource {
 pub struct DocumentOptions {
     pub title: String,
     pub base_href: Option<String>,
-    pub page_size: String,
+    pub page_size: PageSize,
     pub custom_css: Option<String>,
     pub mermaid_source: MermaidSource,
     pub allow_remote_assets: bool,
@@ -40,7 +70,7 @@ pub struct DocumentOptions {
 
 pub fn render_document(body: &str, options: &DocumentOptions) -> String {
     let title = encode_text(&options.title);
-    let page_size = encode_text(&options.page_size);
+    let page_size = options.page_size.as_str();
     let has_mermaid = body.contains("class=\"mermaid\"");
     let mermaid_status = if has_mermaid { "pending" } else { "ready" };
     let base = options
@@ -215,7 +245,7 @@ mod tests {
             "8.5in 11in",
             " Legal ",
         ] {
-            assert_eq!(parse_page_size(size).unwrap(), size.trim());
+            assert_eq!(parse_page_size(size).unwrap().as_str(), size.trim());
         }
     }
 
@@ -242,7 +272,7 @@ mod tests {
             &DocumentOptions {
                 title: "Doc".to_string(),
                 base_href: Some("file:///tmp/docs/".to_string()),
-                page_size: "A4".to_string(),
+                page_size: PageSize::default(),
                 custom_css: None,
                 mermaid_source: MermaidSource::EsModuleUrl(DEFAULT_MERMAID_URL.to_string()),
                 allow_remote_assets: false,
@@ -263,7 +293,7 @@ mod tests {
             &DocumentOptions {
                 title: "Doc".to_string(),
                 base_href: None,
-                page_size: "A4".to_string(),
+                page_size: PageSize::default(),
                 custom_css: None,
                 mermaid_source: MermaidSource::EsModuleUrl(DEFAULT_MERMAID_URL.to_string()),
                 allow_remote_assets: false,
@@ -281,7 +311,7 @@ mod tests {
             &DocumentOptions {
                 title: "Doc".to_string(),
                 base_href: None,
-                page_size: "A4".to_string(),
+                page_size: PageSize::default(),
                 custom_css: Some("body { background: url(http://127.0.0.1/private); }".to_string()),
                 mermaid_source: MermaidSource::InlineScript(String::new()),
                 allow_remote_assets: true,
