@@ -25,8 +25,8 @@ from typing import Any
 
 TOOL_NAME = "convert_markdown_to_pdf"
 SERVER_NAME = "md-to-pdf"
-SERVER_VERSION = "0.5.1"
-BINARY_VERSION = "0.5.1"
+SERVER_VERSION = "0.6.0"
+BINARY_VERSION = "0.6.0"
 PROTOCOL_VERSION = "2024-11-05"
 REPOSITORY = "MiguelElGallo/md-to-pdf"
 
@@ -60,7 +60,10 @@ _TOOLS: list[dict[str, Any]] = [
                 },
                 "page_size": {
                     "type": "string",
-                    "description": "CSS page size (e.g. A4, Letter, Legal). Defaults to A4.",
+                    "description": (
+                        "CSS page size, e.g. A4, Letter, Legal, 'A4 landscape', or "
+                        "'210mm 297mm'. Defaults to A4."
+                    ),
                     "default": "A4",
                 },
                 "allow_html": {

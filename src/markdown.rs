@@ -48,6 +48,10 @@ fn assign_heading_ids(events: &mut [Event<'_>]) {
         .iter()
         .filter_map(|event| match event {
             Event::Start(Tag::Heading { id: Some(id), .. }) => Some(id.to_string()),
+            // pulldown-cmark uses footnote labels as element ids.
+            Event::Start(Tag::FootnoteDefinition(label)) | Event::FootnoteReference(label) => {
+                Some(label.to_string())
+            }
             _ => None,
         })
         .collect();
@@ -200,6 +204,18 @@ mod tests {
         let html = markdown_to_body("Getting\nStarted\n=======", &HtmlOptions::default());
 
         assert!(html.contains("<h1 id=\"getting-started\">"));
+    }
+
+    #[test]
+    fn heading_ids_do_not_collide_with_footnote_ids() {
+        let html = markdown_to_body(
+            "# Note\n\nText[^note].\n\n[^note]: A footnote.",
+            &HtmlOptions::default(),
+        );
+
+        assert!(html.contains("<h1 id=\"note-1\">"));
+        assert!(html.contains("id=\"note\""));
+        assert!(html.contains("href=\"#note\""));
     }
 
     #[test]
