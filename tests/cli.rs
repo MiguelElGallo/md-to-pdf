@@ -228,17 +228,25 @@ fn browser_smoke_headings_produce_outline_and_internal_links() {
         .success();
 
     let pdf = fs::read(output).unwrap();
-    let contains = |needle: &[u8]| pdf.windows(needle.len()).any(|window| window == needle);
+    let contains =
+        |haystack: &[u8], needle: &[u8]| haystack.windows(needle.len()).any(|w| w == needle);
     assert!(
-        contains(b"/Outlines"),
+        contains(&pdf, b"/Outlines"),
         "PDF should include a document outline"
     );
+    let has_internal_link_annotation =
+        String::from_utf8_lossy(&pdf).split("endobj").any(|object| {
+            object.contains("/Type /Annot")
+                && object.contains("/Subtype /Link")
+                && object.contains("/Dest /results")
+                && !object.contains("/URI")
+        });
     assert!(
-        contains(b"/Subtype /Link") && contains(b"/Dest /results"),
-        "the [results](#results) Markdown link should become an internal PDF link"
+        has_internal_link_annotation,
+        "the [results](#results) Markdown link should become a link annotation pointing at /results"
     );
     assert!(
-        contains(b"/StructTreeRoot"),
+        contains(&pdf, b"/StructTreeRoot"),
         "PDF should be tagged with a structure tree"
     );
 }
