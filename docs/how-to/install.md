@@ -148,7 +148,7 @@ To disable automatic downloads, set `MD_TO_PDF_AUTO_INSTALL=0` before launching 
 
 ## Install the standalone CLI
 
-Download the archive for your platform and its matching `.sha256` file from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest). The names below use `<tag>` for a release tag, such as `v0.5.1`.
+Download the archive for your platform and its matching `.sha256` file from the [latest release](https://github.com/MiguelElGallo/md-to-pdf/releases/latest). The names below use `<tag>` for a release tag, such as `v0.6.0`.
 
 | Platform | Archive |
 | --- | --- |
@@ -166,7 +166,7 @@ curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/script
 The script detects Apple Silicon or Intel, verifies the matching checksum, and installs to `/usr/local/bin` using administrator access. To pin a release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | MD_TO_PDF_VERSION=v0.5.1 sh
+curl -fsSL https://raw.githubusercontent.com/MiguelElGallo/md-to-pdf/main/scripts/install-macos.sh | MD_TO_PDF_VERSION=v0.6.0 sh
 ```
 
 For a no-admin installation, verify and extract the matching release archive, then run the extracted binary directly or place it in a user-owned directory on `PATH`. Check the release notes for macOS signing and notarization status.
@@ -176,7 +176,7 @@ For a no-admin installation, verify and extract the matching release archive, th
 In the folder containing the downloaded archive and checksum:
 
 ```sh
-VERSION="v0.5.1" # use the tag you downloaded
+VERSION="v0.6.0" # use the tag you downloaded
 sha256sum -c "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu.sha256" && \
 tar -xzf "md-to-pdf-${VERSION}-x86_64-unknown-linux-gnu.tar.gz" && \
 mkdir -p "$HOME/.local/bin" && \
@@ -191,7 +191,7 @@ Add `$HOME/.local/bin` to your shell's `PATH` if it is not already present. The 
 In PowerShell, from the download folder:
 
 ```powershell
-$version = "v0.5.1" # use the tag you downloaded
+$version = "v0.6.0" # use the tag you downloaded
 $archive = ".\md-to-pdf-$version-x86_64-pc-windows-msvc.zip"
 $checksum = ".\md-to-pdf-$version-x86_64-pc-windows-msvc.sha256"
 $expected = ((Get-Content $checksum -Raw -ErrorAction Stop).Trim() -split '\s+')[0]
@@ -208,7 +208,7 @@ Run the executable by its full path, or put its directory on your user `PATH`. A
 With Rust and Cargo installed:
 
 ```sh
-cargo install --git https://github.com/MiguelElGallo/md-to-pdf --tag v0.5.1
+cargo install --git https://github.com/MiguelElGallo/md-to-pdf --tag v0.6.0
 md-to-pdf --version
 ```
 
