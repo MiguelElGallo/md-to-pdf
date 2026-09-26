@@ -3,7 +3,9 @@ use camino::{Utf8Path, Utf8PathBuf};
 use clap::Parser;
 use md_to_pdf::browser::{file_url, print_to_pdf, BrowserOptions};
 use md_to_pdf::default_output_path;
-use md_to_pdf::document::{render_document, DocumentOptions, MermaidSource, DEFAULT_MERMAID_URL};
+use md_to_pdf::document::{
+    parse_page_size, render_document, DocumentOptions, MermaidSource, DEFAULT_MERMAID_URL,
+};
 use md_to_pdf::markdown::{markdown_to_body, HtmlOptions};
 use std::fs;
 use tempfile::tempdir;
@@ -27,7 +29,7 @@ struct Cli {
     browser: Option<Utf8PathBuf>,
 
     /// CSS page size, for example A4, Letter, or Legal.
-    #[arg(long, default_value = "A4")]
+    #[arg(long, default_value = "A4", value_parser = parse_page_size)]
     page_size: String,
 
     /// Extra CSS file to append after the built-in print styles.

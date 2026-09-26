@@ -1,5 +1,6 @@
 use html_escape::encode_text;
 use pulldown_cmark::{html, CodeBlockKind, CowStr, Event, Options, Parser, Tag, TagEnd};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Default)]
 pub struct HtmlOptions {
@@ -33,9 +34,83 @@ pub fn markdown_to_body(markdown: &str, options: &HtmlOptions) -> String {
         }
     }
 
+    assign_heading_ids(&mut events);
+
     let mut body = String::new();
     html::push_html(&mut body, events.into_iter());
     body
+}
+
+/// Gives headings without an explicit `{#id}` a GitHub-style slug so that
+/// in-document links such as `[Usage](#usage)` resolve in the generated PDF.
+fn assign_heading_ids(events: &mut [Event<'_>]) {
+    let mut used: HashSet<String> = events
+        .iter()
+        .filter_map(|event| match event {
+            Event::Start(Tag::Heading { id: Some(id), .. }) => Some(id.to_string()),
+            _ => None,
+        })
+        .collect();
+
+    let mut index = 0;
+    while index < events.len() {
+        if !matches!(events[index], Event::Start(Tag::Heading { id: None, .. })) {
+            index += 1;
+            continue;
+        }
+
+        let mut text = String::new();
+        let mut end = index + 1;
+        while end < events.len() && !matches!(events[end], Event::End(TagEnd::Heading(_))) {
+            if let Event::Text(value) | Event::Code(value) = &events[end] {
+                text.push_str(value);
+            }
+            end += 1;
+        }
+
+        let slug = unique_slug(&slugify(&text), &mut used);
+        if let Event::Start(Tag::Heading { id, .. }) = &mut events[index] {
+            *id = Some(CowStr::from(slug));
+        }
+        index = end;
+    }
+}
+
+fn slugify(text: &str) -> String {
+    let slug: String = text
+        .trim()
+        .chars()
+        .filter_map(|character| {
+            if character.is_alphanumeric() || character == '_' || character == '-' {
+                Some(character.to_lowercase().collect::<String>())
+            } else if character.is_whitespace() {
+                Some("-".to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if slug.is_empty() {
+        "section".to_string()
+    } else {
+        slug
+    }
+}
+
+fn unique_slug(base: &str, used: &mut HashSet<String>) -> String {
+    if used.insert(base.to_string()) {
+        return base.to_string();
+    }
+
+    let mut suffix = 1;
+    loop {
+        let candidate = format!("{base}-{suffix}");
+        if used.insert(candidate.clone()) {
+            return candidate;
+        }
+        suffix += 1;
+    }
 }
 
 fn markdown_options() -> Options {
@@ -61,7 +136,7 @@ mod tests {
     fn renders_basic_markdown() {
         let html = markdown_to_body("# Title\n\n- one\n- two", &HtmlOptions::default());
 
-        assert!(html.contains("<h1>Title</h1>"));
+        assert!(html.contains("<h1 id=\"title\">Title</h1>"));
         assert!(html.contains("<li>one</li>"));
     }
 
@@ -102,5 +177,27 @@ mod tests {
         );
 
         assert!(html.contains("<section>trusted</section>"));
+    }
+
+    #[test]
+    fn assigns_github_style_heading_ids() {
+        let html = markdown_to_body(
+            "# Getting Started!\n\n## `cargo` & Rust\n\n## Getting Started\n\n## Custom {#getting-started-1}\n\n## Überblick",
+            &HtmlOptions::default(),
+        );
+
+        assert!(html.contains("<h1 id=\"getting-started\">"));
+        assert!(html.contains("<h2 id=\"cargo--rust\">"));
+        assert!(html.contains("<h2 id=\"getting-started-2\">"));
+        assert!(html.contains("<h2 id=\"getting-started-1\">"));
+        assert!(html.contains("<h2 id=\"überblick\">"));
+    }
+
+    #[test]
+    fn falls_back_to_section_for_empty_heading_slugs() {
+        let html = markdown_to_body("# !!!\n\n# ???", &HtmlOptions::default());
+
+        assert!(html.contains("<h1 id=\"section\">"));
+        assert!(html.contains("<h1 id=\"section-1\">"));
     }
 }
