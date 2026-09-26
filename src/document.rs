@@ -3,6 +3,25 @@ use html_escape::{encode_double_quoted_attribute, encode_text};
 pub const DEFAULT_MERMAID_URL: &str =
     "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs";
 
+/// Accepts CSS `@page` size values such as `A4`, `Letter landscape`, or
+/// `210mm 297mm`, rejecting characters that could escape the CSS declaration.
+pub fn parse_page_size(value: &str) -> Result<String, String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err("page size must not be empty".to_string());
+    }
+    if value.len() > 64
+        || !value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, ' ' | '.' | '-')
+        })
+    {
+        return Err(format!(
+            "invalid page size {value:?}; use a CSS page size such as A4, Letter, \"A4 landscape\", or \"210mm 297mm\""
+        ));
+    }
+    Ok(value.to_string())
+}
+
 #[derive(Debug, Clone)]
 pub enum MermaidSource {
     EsModuleUrl(String),
@@ -185,6 +204,36 @@ function reportMermaidError(error) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accepts_css_page_sizes() {
+        for size in [
+            "A4",
+            "Letter",
+            "A4 landscape",
+            "210mm 297mm",
+            "8.5in 11in",
+            " Legal ",
+        ] {
+            assert_eq!(parse_page_size(size).unwrap(), size.trim());
+        }
+    }
+
+    #[test]
+    fn rejects_page_sizes_that_could_inject_css() {
+        for size in [
+            "",
+            "A4; margin: 0",
+            "A4 } body { display: none",
+            "A4</style>",
+            "A4\nLetter",
+        ] {
+            assert!(
+                parse_page_size(size).is_err(),
+                "{size:?} should be rejected"
+            );
+        }
+    }
 
     #[test]
     fn renders_base_href_and_mermaid_loader() {

@@ -22,7 +22,7 @@ md-to-pdf guide.md --mermaid-js ./vendor/mermaid.min.js # local Mermaid bundle
 | `-o, --output <PATH>` | `<input>.pdf` | PDF output path. |
 | `--title <TITLE>` | Input file name without extension | Document title stored in the generated HTML and PDF metadata. |
 | `--browser <PATH>` | Auto-detect or `MD_TO_PDF_BROWSER` | Chrome, Chromium, or Edge executable to use. |
-| `--page-size <SIZE>` | `A4` | CSS page size such as `A4`, `Letter`, or `Legal`. |
+| `--page-size <SIZE>` | `A4` | CSS page size such as `A4`, `Letter`, `Legal`, `A4 landscape`, or `210mm 297mm`. Only letters, digits, spaces, `.`, and `-` are accepted. |
 | `--css <PATH>` | None | Extra CSS file appended after built-in print styles. |
 | `--mermaid-url <URL>` | jsDelivr Mermaid 11.12.0 | Mermaid ES module URL. Conflicts with `--mermaid-js`. |
 | `--mermaid-js <PATH>` | None | Local Mermaid browser bundle that exposes `window.mermaid`. Conflicts with `--mermaid-url`. |

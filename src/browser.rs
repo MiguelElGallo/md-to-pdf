@@ -59,7 +59,9 @@ pub fn print_to_pdf(
         "Page.printToPDF",
         json!({
             "printBackground": true,
-            "preferCSSPageSize": true
+            "preferCSSPageSize": true,
+            "generateTaggedPDF": true,
+            "generateDocumentOutline": true
         }),
     )?;
     let data = pdf

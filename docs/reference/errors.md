@@ -14,6 +14,7 @@ Start with the first line of the error message, then match it against the table 
 | `input path is a directory` | The input is a directory, not a file. | Pass a Markdown file. |
 | `output path would overwrite the input file` | `--output` points to the Markdown input. | Choose a separate PDF output path. |
 | `HTML debug path conflicts with the PDF output` | `--keep-html` was used with an output path ending in `.html`. | Use a PDF output path, such as `report.pdf`. |
+| `invalid value '...' for '--page-size <PAGE_SIZE>'` | The page size contains characters that are not valid in a CSS page size. | Use a value such as `A4`, `Letter`, `A4 landscape`, or `210mm 297mm`. |
 | `could not find Chrome, Chromium, or Edge` | Browser discovery failed. | Pass `--browser /path/to/chrome` or set `MD_TO_PDF_BROWSER`. |
 | `failed to read Mermaid script` | `--mermaid-js` points to a missing file. | Check the bundle path. |
 | `Mermaid render failed` | Mermaid syntax or runtime loading failed. | Fix the diagram or use a local Mermaid bundle. |

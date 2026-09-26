@@ -207,6 +207,39 @@ fn browser_smoke_plain_markdown() {
 }
 
 #[test]
+fn browser_smoke_headings_produce_outline_and_internal_links() {
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let temp_dir = tempdir().unwrap();
+    let output = temp_dir.path().join("headings.pdf");
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            "fixtures/headings.md",
+            "--output",
+            output.to_str().unwrap(),
+            "--browser",
+            &browser,
+        ])
+        .assert()
+        .success();
+
+    let pdf = fs::read(output).unwrap();
+    let contains = |needle: &[u8]| pdf.windows(needle.len()).any(|window| window == needle);
+    assert!(
+        contains(b"/Outlines"),
+        "PDF should include a document outline"
+    );
+    assert!(
+        contains(b"/Dest"),
+        "PDF should include internal link destinations"
+    );
+}
+
+#[test]
 fn browser_smoke_valid_mermaid() {
     let Some(browser) = smoke_browser() else {
         eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
@@ -354,4 +387,20 @@ fn browser_remote_asset_opt_in_preserves_network_images() {
 
 fn smoke_browser() -> Option<String> {
     std::env::var("MD_TO_PDF_BROWSER").ok()
+}
+
+#[test]
+fn invalid_page_size_fails_before_browser_discovery() {
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            "fixtures/basic.md",
+            "--page-size",
+            "A4; margin: 0",
+            "--browser",
+            "/definitely/not/a/browser",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid page size"));
 }
