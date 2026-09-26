@@ -62,8 +62,10 @@ fn assign_heading_ids(events: &mut [Event<'_>]) {
         let mut text = String::new();
         let mut end = index + 1;
         while end < events.len() && !matches!(events[end], Event::End(TagEnd::Heading(_))) {
-            if let Event::Text(value) | Event::Code(value) = &events[end] {
-                text.push_str(value);
+            match &events[end] {
+                Event::Text(value) | Event::Code(value) => text.push_str(value),
+                Event::SoftBreak | Event::HardBreak => text.push(' '),
+                _ => {}
             }
             end += 1;
         }
@@ -191,6 +193,13 @@ mod tests {
         assert!(html.contains("<h2 id=\"getting-started-2\">"));
         assert!(html.contains("<h2 id=\"getting-started-1\">"));
         assert!(html.contains("<h2 id=\"überblick\">"));
+    }
+
+    #[test]
+    fn separates_words_across_setext_heading_lines() {
+        let html = markdown_to_body("Getting\nStarted\n=======", &HtmlOptions::default());
+
+        assert!(html.contains("<h1 id=\"getting-started\">"));
     }
 
     #[test]
