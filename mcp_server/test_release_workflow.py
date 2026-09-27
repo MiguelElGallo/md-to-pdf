@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
 import subprocess
@@ -10,6 +11,16 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github/workflows/release.yml"
+RELEASE_NOTES_PATH = REPOSITORY_ROOT / "scripts/release_notes.py"
+CHANGELOG_PATH = REPOSITORY_ROOT / "CHANGELOG.md"
+
+
+def _load_release_notes_module():
+    spec = importlib.util.spec_from_file_location("release_notes", RELEASE_NOTES_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _step(workflow: str, name: str) -> str:
@@ -125,7 +136,10 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
         self.assertNotIn("rust-cache", self.workflow)
         self.assertNotIn('"$binary" --version', macos)
         self.assertNotIn('"$binary" --help', macos)
-        self.assertIn("needs:\n      - plan\n      - build\n      - package-macos", _job(self.workflow, "attest"))
+        self.assertIn(
+            "needs:\n      - plan\n      - build\n      - package-macos",
+            _job(self.workflow, "attest"),
+        )
 
     def test_all_four_final_artifact_targets_are_present(self) -> None:
         for target in (
@@ -135,6 +149,64 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
             "aarch64-apple-darwin",
         ):
             self.assertIn(target, self.workflow)
+
+
+class ReleaseNotesTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.release_notes = _load_release_notes_module()
+        cls.workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    def test_current_version_has_a_changelog_entry(self) -> None:
+        cargo = (REPOSITORY_ROOT / "Cargo.toml").read_text(encoding="utf-8")
+        match = re.search(r'^version = "([^"]+)"', cargo, re.MULTILINE)
+        assert match is not None
+        section = self.release_notes.changelog_section(
+            CHANGELOG_PATH.read_text(encoding="utf-8"), match.group(1)
+        )
+        self.assertTrue(section.startswith("### "))
+
+    def test_extracts_only_the_requested_section(self) -> None:
+        changelog = textwrap.dedent(
+            """\
+            # Changelog
+
+            ## [1.2.0]
+
+            - New thing.
+
+            ## [1.1.0]
+
+            - Old thing.
+            """
+        )
+        notes = self.release_notes.release_notes(
+            changelog, "1.2.0", "v1.2.0", "Signed and notarized."
+        )
+
+        self.assertIn("## md-to-pdf v1.2.0", notes)
+        self.assertIn("- New thing.", notes)
+        self.assertNotIn("Old thing", notes)
+        self.assertIn("### macOS trust status\n\nSigned and notarized.", notes)
+
+    def test_missing_or_empty_section_is_rejected(self) -> None:
+        with self.assertRaises(LookupError):
+            self.release_notes.changelog_section("## [1.0.0]\n\n- x\n", "1.0.1")
+        with self.assertRaises(LookupError):
+            self.release_notes.changelog_section(
+                "## [1.0.1]\n\n## [1.0.0]\n- x\n", "1.0.1"
+            )
+        with self.assertRaises(LookupError):
+            self.release_notes.changelog_section("## [1.0.10]\n\n- x\n", "1.0.1")
+
+    def test_workflow_uses_changelog_for_release_notes(self) -> None:
+        validate = _step(self.workflow, "Validate changelog entry")
+        notes = _step(self.workflow, "Create release notes")
+
+        self.assertIn('scripts/release_notes.py "$RELEASE_VERSION"', validate)
+        self.assertIn("scripts/release_notes.py", notes)
+        self.assertNotIn("### Changed", notes)
+        self.assertNotIn("${{", notes[notes.index("        run: |") :])
 
 
 if __name__ == "__main__":

@@ -160,6 +160,13 @@ jobs:
             exit 1
           fi
 
+      - name: Validate changelog entry
+        if: ${{ needs.plan.outputs.publishing == 'true' }}
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+        run: python3 scripts/release_notes.py "$RELEASE_VERSION"
+
       - name: Validate macOS signing policy
         if: ${{ needs.plan.outputs.publishing == 'true' && needs.plan.outputs.macos_signing != 'true' && needs.plan.outputs.allow_unsigned_macos != 'true' }}
         shell: bash
@@ -493,44 +500,18 @@ jobs:
         shell: bash
         env:
           MACOS_SIGNING: ${{ needs.plan.outputs.macos_signing }}
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: |
           if [[ "$MACOS_SIGNING" == "true" ]]; then
             macos_status="The macOS artifacts in this release are Developer ID signed with the hardened runtime and accepted by Apple's notary service. Verify the SHA-256 checksum before running the binary."
           else
             macos_status="The macOS artifacts in this release are not Apple Developer ID signed and are not notarized because this release explicitly allowed unsigned macOS artifacts. Gatekeeper may warn on first run. Verify the SHA-256 checksum before running the binary."
           fi
-          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          ## md-to-pdf ${{ needs.plan.outputs.tag }}
-
-          This release includes platform archives, SHA-256 checksum files, and GitHub artifact attestations.
-
-          ### Changed
-
-          - Blocked HTTP(S) assets referenced by Markdown, CSS, or raw HTML by default. Trusted documents can explicitly restore them with `--allow-remote-assets` or the matching MCP option; the built-in Mermaid CDN remains available.
-          - Removed workflow-dispatch command injection from the release planner by validating tag input before any signing secret is available.
-          - Pinned every release action to an immutable commit and isolated macOS signing/notarization onto fresh runners after secret-free builds.
-          - Added browser-level SSRF regression tests, release-workflow structure tests, and macOS code-signing and notarization verification.
-
-          ### Upgrade notes
-
-          Remote document assets that previously loaded automatically now require `allow_remote_assets: true` (MCP) or `--allow-remote-assets` (CLI). This trusted-content opt-in permits requests to private and local networks. A custom Mermaid URL also requires the opt-in; the default Mermaid CDN and local `mermaid_js` bundles continue to work without it.
-
-          ### macOS trust status
-
-          MACOS_STATUS_PLACEHOLDER
-
-          ### Verification
-
-          Download the archive and matching `.sha256` file, then run `shasum -a 256 -c <file>.sha256` on macOS/Linux or `Get-FileHash` on Windows.
-          NOTES
-          python3 - <<'PY' "$RUNNER_TEMP/release-notes.md" "$macos_status"
-          import pathlib
-          import sys
-
-          path = pathlib.Path(sys.argv[1])
-          status = sys.argv[2]
-          path.write_text(path.read_text().replace("MACOS_STATUS_PLACEHOLDER", status))
-          PY
+          python3 scripts/release_notes.py "$RELEASE_VERSION" \
+            --tag "$RELEASE_TAG" \
+            --macos-status "$macos_status" \
+            --output "$RUNNER_TEMP/release-notes.md"
 
       - name: Create GitHub Release
         env:
