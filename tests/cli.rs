@@ -299,8 +299,10 @@ fn browser_smoke_invalid_mermaid_fails() {
         ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Mermaid render failed"))
-        .stderr(predicate::str::contains("Retrying").not());
+        .stderr(predicate::str::contains(
+            "Mermaid render failed: Parse error",
+        ))
+        .stderr(predicate::str::contains("Mermaid failed to load after").not());
 }
 
 #[test]
@@ -476,7 +478,7 @@ fn flaky_mermaid_server(
                         (
                             &server_entry,
                             entry_failures,
-                            r#"export default { initialize() {}, async run() { await import("./chunk.mjs"); } };"#,
+                            r#"export default { initialize() {}, async run() { await import("./chunk.mjs"); if (document.querySelector(".mermaid").textContent.trim().endsWith("-->")) { throw new Error("Parse error on line 3"); } } };"#,
                         )
                     } else if request_line.contains("/chunk.mjs ") {
                         (&server_chunk, chunk_failures, "export const loaded = true;")
@@ -507,12 +509,20 @@ fn flaky_mermaid_server(
 }
 
 fn convert_with_mermaid_url(browser: &str, url: &str) -> assert_cmd::assert::Assert {
+    convert_fixture_with_mermaid_url(browser, url, "fixtures/mermaid-flowchart.md")
+}
+
+fn convert_fixture_with_mermaid_url(
+    browser: &str,
+    url: &str,
+    fixture: &str,
+) -> assert_cmd::assert::Assert {
     let temp_dir = tempdir().unwrap();
     let output = temp_dir.path().join("retry.pdf");
     Command::cargo_bin("md-to-pdf")
         .unwrap()
         .args([
-            "fixtures/mermaid-flowchart.md",
+            fixture,
             "--output",
             output.to_str().unwrap(),
             "--browser",
@@ -596,4 +606,24 @@ fn browser_smoke_mermaid_load_failure_gives_up_after_all_retries() {
 
     assert_eq!(requests.load(Ordering::SeqCst), 5);
     assert!(started.elapsed() >= Duration::from_secs(19));
+}
+
+#[test]
+fn browser_smoke_mermaid_syntax_error_is_not_retried() {
+    use std::sync::atomic::Ordering;
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let (url, stop, requests, _) = flaky_mermaid_server(0, 0);
+
+    convert_fixture_with_mermaid_url(&browser, &url, "fixtures/invalid-mermaid.md")
+        .failure()
+        .stderr(predicate::str::contains(
+            "Mermaid render failed: Parse error on line 3",
+        ))
+        .stderr(predicate::str::contains("Retrying").not());
+    stop.store(true, Ordering::SeqCst);
+
+    assert_eq!(requests.load(Ordering::SeqCst), 1);
 }
