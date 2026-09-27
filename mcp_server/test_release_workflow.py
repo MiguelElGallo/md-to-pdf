@@ -136,7 +136,10 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
         self.assertNotIn("rust-cache", self.workflow)
         self.assertNotIn('"$binary" --version', macos)
         self.assertNotIn('"$binary" --help', macos)
-        self.assertIn("needs:\n      - plan\n      - build\n      - package-macos", _job(self.workflow, "attest"))
+        self.assertIn(
+            "needs:\n      - plan\n      - build\n      - package-macos",
+            _job(self.workflow, "attest"),
+        )
 
     def test_all_four_final_artifact_targets_are_present(self) -> None:
         for target in (
@@ -146,7 +149,6 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
             "aarch64-apple-darwin",
         ):
             self.assertIn(target, self.workflow)
-
 
 
 class ReleaseNotesTests(unittest.TestCase):
@@ -191,7 +193,9 @@ class ReleaseNotesTests(unittest.TestCase):
         with self.assertRaises(LookupError):
             self.release_notes.changelog_section("## [1.0.0]\n\n- x\n", "1.0.1")
         with self.assertRaises(LookupError):
-            self.release_notes.changelog_section("## [1.0.1]\n\n## [1.0.0]\n- x\n", "1.0.1")
+            self.release_notes.changelog_section(
+                "## [1.0.1]\n\n## [1.0.0]\n- x\n", "1.0.1"
+            )
         with self.assertRaises(LookupError):
             self.release_notes.changelog_section("## [1.0.10]\n\n- x\n", "1.0.1")
 
