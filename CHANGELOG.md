@@ -2,6 +2,13 @@
 
 All notable changes to md-to-pdf are documented here. The release workflow publishes the section matching the tag as the GitHub release notes, and refuses to publish a tag without one.
 
+## [0.7.0]
+
+### Added
+
+- Transient Mermaid download failures are retried automatically. When the Mermaid runtime or one of its chunks fails to load, md-to-pdf prints a message to stderr and reloads the page after 1, 3, 5, and then 10 seconds, for up to five attempts. Diagram syntax errors are still reported immediately.
+- The MCP server writes the converter's diagnostics, such as retry messages, to its log, and scales its conversion timeout so every retry fits within it.
+
 ## [0.6.1]
 
 ### Fixed
