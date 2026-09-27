@@ -2,6 +2,12 @@
 
 All notable changes to md-to-pdf are documented here. The release workflow publishes the section matching the tag as the GitHub release notes, and refuses to publish a tag without one.
 
+## [0.6.1]
+
+### Fixed
+
+- Converting a Markdown file passed as a bare file name, such as `md-to-pdf report.md` or the MCP input `report.md`, no longer fails with `failed to resolve`. The file's directory now defaults to the current directory.
+
 ## [0.6.0]
 
 ### Added

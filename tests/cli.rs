@@ -416,3 +416,18 @@ fn invalid_page_size_fails_before_browser_discovery() {
         .failure()
         .stderr(predicate::str::contains("invalid page size"));
 }
+
+#[test]
+fn bare_input_file_name_resolves_relative_to_current_directory() {
+    let temp_dir = tempdir().unwrap();
+    fs::write(temp_dir.path().join("report.md"), "# Report\n").unwrap();
+
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .current_dir(temp_dir.path())
+        .args(["report.md", "--browser", "/definitely/not/a/browser"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("failed to start browser"))
+        .stderr(predicate::str::contains("failed to resolve").not());
+}
