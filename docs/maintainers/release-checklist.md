@@ -6,6 +6,7 @@ icon: lucide/list-checks
 
 Before publishing a release:
 
+- Add a `## [X.Y.Z]` section to `CHANGELOG.md`. The release workflow publishes it as the GitHub release notes and fails before building if it is missing.
 - Run `cargo fmt --check`.
 - Run `cargo clippy --locked --all-targets -- -D warnings`.
 - Run `cargo test --locked`.
