@@ -433,13 +433,17 @@ fn bare_input_file_name_resolves_relative_to_current_directory() {
         .stderr(predicate::str::contains("failed to resolve").not());
 }
 
-/// Serves a stand-in Mermaid ES module that fails with HTTP 503 for the first
-/// `failures` requests. Returns the module URL, a stop flag, and the request counter.
+/// Serves a stand-in Mermaid ES module whose `run()` lazily imports a chunk,
+/// like the real runtime. The entry module fails with HTTP 503 for the first
+/// `entry_failures` requests and the chunk for the first `chunk_failures`.
+/// Returns the module URL, a stop flag, and the entry and chunk request counters.
 fn flaky_mermaid_server(
-    failures: usize,
+    entry_failures: usize,
+    chunk_failures: usize,
 ) -> (
     String,
     std::sync::Arc<std::sync::atomic::AtomicBool>,
+    std::sync::Arc<std::sync::atomic::AtomicUsize>,
     std::sync::Arc<std::sync::atomic::AtomicUsize>,
 ) {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -449,8 +453,10 @@ fn flaky_mermaid_server(
     listener.set_nonblocking(true).unwrap();
     let url = format!("http://{}/mermaid.mjs", listener.local_addr().unwrap());
     let stop = Arc::new(AtomicBool::new(false));
-    let requests = Arc::new(AtomicUsize::new(0));
-    let (server_stop, server_requests) = (stop.clone(), requests.clone());
+    let entry_requests = Arc::new(AtomicUsize::new(0));
+    let chunk_requests = Arc::new(AtomicUsize::new(0));
+    let (server_stop, server_entry, server_chunk) =
+        (stop.clone(), entry_requests.clone(), chunk_requests.clone());
     thread::spawn(move || {
         while !server_stop.load(Ordering::SeqCst) {
             match listener.accept() {
@@ -461,17 +467,28 @@ fn flaky_mermaid_server(
                         .unwrap();
                     let mut request = [0_u8; 2048];
                     let _ = stream.read(&mut request);
-                    if !String::from_utf8_lossy(&request).contains("/mermaid.mjs") {
+                    let request_line = String::from_utf8_lossy(&request)
+                        .lines()
+                        .next()
+                        .unwrap_or_default()
+                        .to_string();
+                    let (counter, failures, body) = if request_line.contains("/mermaid.mjs ") {
+                        (
+                            &server_entry,
+                            entry_failures,
+                            r#"export default { initialize() {}, async run() { await import("./chunk.mjs"); } };"#,
+                        )
+                    } else if request_line.contains("/chunk.mjs ") {
+                        (&server_chunk, chunk_failures, "export const loaded = true;")
+                    } else {
                         let _ = stream.write_all(
                             b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
                         );
                         continue;
-                    }
-                    let seen = server_requests.fetch_add(1, Ordering::SeqCst);
-                    let response = if seen < failures {
+                    };
+                    let response = if counter.fetch_add(1, Ordering::SeqCst) < failures {
                         "HTTP/1.1 503 Service Unavailable\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string()
                     } else {
-                        let body = "export default { initialize() {}, async run() {} };";
                         format!(
                             "HTTP/1.1 200 OK\r\nContent-Type: text/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                             body.len()
@@ -486,7 +503,7 @@ fn flaky_mermaid_server(
             }
         }
     });
-    (url, stop, requests)
+    (url, stop, entry_requests, chunk_requests)
 }
 
 fn convert_with_mermaid_url(browser: &str, url: &str) -> assert_cmd::assert::Assert {
@@ -514,7 +531,7 @@ fn browser_smoke_mermaid_load_failure_is_retried() {
         eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
         return;
     };
-    let (url, stop, requests) = flaky_mermaid_server(1);
+    let (url, stop, requests, chunks) = flaky_mermaid_server(1, 0);
 
     let started = Instant::now();
     convert_with_mermaid_url(&browser, &url)
@@ -527,7 +544,31 @@ fn browser_smoke_mermaid_load_failure_is_retried() {
     stop.store(true, Ordering::SeqCst);
 
     assert_eq!(requests.load(Ordering::SeqCst), 2);
+    assert_eq!(chunks.load(Ordering::SeqCst), 1);
     assert!(started.elapsed() >= Duration::from_secs(1));
+}
+
+#[test]
+fn browser_smoke_mermaid_chunk_failure_during_render_is_retried() {
+    use std::sync::atomic::Ordering;
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let (url, stop, requests, chunks) = flaky_mermaid_server(0, 1);
+
+    convert_with_mermaid_url(&browser, &url)
+        .success()
+        .stderr(predicate::str::contains(
+            "Mermaid failed to load: Failed to fetch dynamically imported module",
+        ))
+        .stderr(predicate::str::contains("chunk.mjs"))
+        .stderr(predicate::str::contains("Retrying in 1s (retry 1 of 4)..."))
+        .stderr(predicate::str::contains("retry 2 of 4").not());
+    stop.store(true, Ordering::SeqCst);
+
+    assert_eq!(requests.load(Ordering::SeqCst), 2);
+    assert_eq!(chunks.load(Ordering::SeqCst), 2);
 }
 
 #[test]
@@ -537,7 +578,7 @@ fn browser_smoke_mermaid_load_failure_gives_up_after_all_retries() {
         eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
         return;
     };
-    let (url, stop, requests) = flaky_mermaid_server(usize::MAX);
+    let (url, stop, requests, _) = flaky_mermaid_server(usize::MAX, 0);
 
     let started = Instant::now();
     convert_with_mermaid_url(&browser, &url)
