@@ -148,9 +148,6 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
             self.assertIn(target, self.workflow)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class ReleaseNotesTests(unittest.TestCase):
     @classmethod
@@ -206,3 +203,7 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertIn("scripts/release_notes.py", notes)
         self.assertNotIn("### Changed", notes)
         self.assertNotIn("${{", notes[notes.index("        run: |") :])
+
+
+if __name__ == "__main__":
+    unittest.main()
