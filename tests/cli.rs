@@ -299,7 +299,8 @@ fn browser_smoke_invalid_mermaid_fails() {
         ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Mermaid render failed"));
+        .stderr(predicate::str::contains("Mermaid render failed"))
+        .stderr(predicate::str::contains("Retrying").not());
 }
 
 #[test]
@@ -430,4 +431,125 @@ fn bare_input_file_name_resolves_relative_to_current_directory() {
         .failure()
         .stderr(predicate::str::contains("failed to start browser"))
         .stderr(predicate::str::contains("failed to resolve").not());
+}
+
+/// Serves a stand-in Mermaid ES module that fails with HTTP 503 for the first
+/// `failures` requests. Returns the module URL, a stop flag, and the request counter.
+fn flaky_mermaid_server(
+    failures: usize,
+) -> (
+    String,
+    std::sync::Arc<std::sync::atomic::AtomicBool>,
+    std::sync::Arc<std::sync::atomic::AtomicUsize>,
+) {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}/mermaid.mjs", listener.local_addr().unwrap());
+    let stop = Arc::new(AtomicBool::new(false));
+    let requests = Arc::new(AtomicUsize::new(0));
+    let (server_stop, server_requests) = (stop.clone(), requests.clone());
+    thread::spawn(move || {
+        while !server_stop.load(Ordering::SeqCst) {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    stream.set_nonblocking(false).unwrap();
+                    let mut request = [0_u8; 2048];
+                    let _ = stream.read(&mut request);
+                    if !String::from_utf8_lossy(&request).contains("/mermaid.mjs") {
+                        let _ = stream.write_all(
+                            b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                        );
+                        continue;
+                    }
+                    let seen = server_requests.fetch_add(1, Ordering::SeqCst);
+                    let response = if seen < failures {
+                        "HTTP/1.1 503 Service Unavailable\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string()
+                    } else {
+                        let body = "export default { initialize() {}, async run() {} };";
+                        format!(
+                            "HTTP/1.1 200 OK\r\nContent-Type: text/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                            body.len()
+                        )
+                    };
+                    let _ = stream.write_all(response.as_bytes());
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(error) => panic!("Mermaid server failed: {error}"),
+            }
+        }
+    });
+    (url, stop, requests)
+}
+
+fn convert_with_mermaid_url(browser: &str, url: &str) -> assert_cmd::assert::Assert {
+    let temp_dir = tempdir().unwrap();
+    let output = temp_dir.path().join("retry.pdf");
+    Command::cargo_bin("md-to-pdf")
+        .unwrap()
+        .args([
+            "fixtures/mermaid-flowchart.md",
+            "--output",
+            output.to_str().unwrap(),
+            "--browser",
+            browser,
+            "--allow-remote-assets",
+            "--mermaid-url",
+            url,
+        ])
+        .assert()
+}
+
+#[test]
+fn browser_smoke_mermaid_load_failure_is_retried() {
+    use std::sync::atomic::Ordering;
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let (url, stop, requests) = flaky_mermaid_server(1);
+
+    let started = Instant::now();
+    convert_with_mermaid_url(&browser, &url)
+        .success()
+        .stderr(predicate::str::contains(
+            "Mermaid failed to load: Failed to fetch dynamically imported module",
+        ))
+        .stderr(predicate::str::contains("Retrying in 1s (retry 1 of 4)..."))
+        .stderr(predicate::str::contains("retry 2 of 4").not());
+    stop.store(true, Ordering::SeqCst);
+
+    assert_eq!(requests.load(Ordering::SeqCst), 2);
+    assert!(started.elapsed() >= Duration::from_secs(1));
+}
+
+#[test]
+fn browser_smoke_mermaid_load_failure_gives_up_after_all_retries() {
+    use std::sync::atomic::Ordering;
+    let Some(browser) = smoke_browser() else {
+        eprintln!("skipping browser smoke test; set MD_TO_PDF_BROWSER to enable it");
+        return;
+    };
+    let (url, stop, requests) = flaky_mermaid_server(usize::MAX);
+
+    let started = Instant::now();
+    convert_with_mermaid_url(&browser, &url)
+        .failure()
+        .stderr(predicate::str::contains("Retrying in 1s (retry 1 of 4)..."))
+        .stderr(predicate::str::contains("Retrying in 3s (retry 2 of 4)..."))
+        .stderr(predicate::str::contains("Retrying in 5s (retry 3 of 4)..."))
+        .stderr(predicate::str::contains(
+            "Retrying in 10s (retry 4 of 4)...",
+        ))
+        .stderr(predicate::str::contains(
+            "Mermaid failed to load after 5 attempts",
+        ));
+    stop.store(true, Ordering::SeqCst);
+
+    assert_eq!(requests.load(Ordering::SeqCst), 5);
+    assert!(started.elapsed() >= Duration::from_secs(19));
 }

@@ -17,6 +17,7 @@ Start with the first line of the error message, then match it against the table 
 | `invalid value '...' for '--page-size <PAGE_SIZE>'` | The page size contains characters that are not valid in a CSS page size. | Use a value such as `A4`, `Letter`, `A4 landscape`, or `210mm 297mm`. |
 | `could not find Chrome, Chromium, or Edge` | Browser discovery failed. | Pass `--browser /path/to/chrome` or set `MD_TO_PDF_BROWSER`. |
 | `failed to read Mermaid script` | `--mermaid-js` points to a missing file. | Check the bundle path. |
+| `Mermaid failed to load after 5 attempts` | The Mermaid runtime could not be downloaded, even after retrying for about 19 seconds. | Check network access to the Mermaid URL, or use a local Mermaid bundle with `--mermaid-js`. |
 | `Mermaid render failed` | Mermaid syntax or runtime loading failed. | Fix the diagram or use a local Mermaid bundle. |
 | `timed out waiting for Mermaid rendering` | Rendering took longer than the budget. | Increase `--virtual-time-budget`. |
 | Local image or asset is missing from the PDF | Browser local file access is disabled or the relative path is wrong. | Use a path relative to the Markdown file and pass `--allow-local-files` for trusted documents. |

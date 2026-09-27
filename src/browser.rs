@@ -18,6 +18,26 @@ const BROWSER_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 const CDP_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 const CDP_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const DEVTOOLS_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
+/// Delays before reloading the page when the Mermaid runtime fails to download.
+pub const MERMAID_LOAD_RETRY_DELAYS: [Duration; 4] = [
+    Duration::from_secs(1),
+    Duration::from_secs(3),
+    Duration::from_secs(5),
+    Duration::from_secs(10),
+];
+
+/// The Mermaid runtime or one of its chunks could not be downloaded. Unlike
+/// diagram syntax errors, this is usually transient and worth retrying.
+#[derive(Debug)]
+struct MermaidLoadError(String);
+
+impl std::fmt::Display for MermaidLoadError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "Mermaid failed to load: {}", self.0)
+    }
+}
+
+impl std::error::Error for MermaidLoadError {}
 
 #[derive(Debug, Clone)]
 pub struct BrowserOptions {
@@ -50,9 +70,17 @@ pub fn print_to_pdf(
 
     client.send("Page.enable", json!({}))?;
     client.send("Runtime.enable", json!({}))?;
-    wait_for_mermaid(
-        &mut client,
-        Duration::from_millis(options.virtual_time_budget_ms),
+    let budget = Duration::from_millis(options.virtual_time_budget_ms);
+    retry_mermaid_load(
+        &MERMAID_LOAD_RETRY_DELAYS,
+        thread::sleep,
+        |message| eprintln!("{message}"),
+        |attempt| {
+            if attempt > 0 {
+                reload_page(&mut client)?;
+            }
+            wait_for_mermaid(&mut client, budget)
+        },
     )?;
 
     let pdf = client.send(
@@ -250,6 +278,62 @@ fn set_socket_timeout(stream: &MaybeTlsStream<TcpStream>, timeout: Duration) -> 
     Ok(())
 }
 
+/// Runs `attempt` and, while it fails with a [`MermaidLoadError`], waits for the
+/// next delay and tries again. Other errors, such as diagram syntax errors, are
+/// returned immediately.
+fn retry_mermaid_load(
+    delays: &[Duration],
+    mut sleep: impl FnMut(Duration),
+    mut log: impl FnMut(&str),
+    mut attempt: impl FnMut(usize) -> Result<()>,
+) -> Result<()> {
+    let mut attempt_index = 0;
+    loop {
+        let error = match attempt(attempt_index) {
+            Ok(()) => return Ok(()),
+            Err(error) => error,
+        };
+        let Some(load_error) = error.downcast_ref::<MermaidLoadError>() else {
+            return Err(error);
+        };
+        let Some(&delay) = delays.get(attempt_index) else {
+            bail!(
+                "Mermaid failed to load after {} attempts: {}",
+                attempt_index + 1,
+                load_error.0
+            );
+        };
+        attempt_index += 1;
+        log(&format!(
+            "{load_error}. Retrying in {}s (retry {attempt_index} of {})...",
+            delay.as_secs_f64(),
+            delays.len()
+        ));
+        sleep(delay);
+    }
+}
+
+fn reload_page(client: &mut CdpClient) -> Result<()> {
+    // Mark the old document so the next poll cannot mistake its stale
+    // load-error status for the reloaded page's result.
+    evaluate_json(
+        client,
+        r#"(() => { document.documentElement.dataset.mermaidStatus = "reloading"; return true; })()"#,
+    )?;
+    // A fresh document gets a fresh module map; Chrome caches failed module
+    // imports for the lifetime of a document, so retrying import() in place fails.
+    client.send("Page.reload", json!({ "ignoreCache": true }))?;
+    Ok(())
+}
+
+fn is_navigation_race(error: &anyhow::Error) -> bool {
+    let message = error.to_string();
+    message.contains("did not return a value")
+        || message.contains("Execution context was destroyed")
+        || message.contains("Cannot find context with specified id")
+        || message.contains("Inspected target navigated or closed")
+}
+
 fn wait_for_mermaid(client: &mut CdpClient, timeout: Duration) -> Result<()> {
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
@@ -262,7 +346,7 @@ fn wait_for_mermaid(client: &mut CdpClient, timeout: Duration) -> Result<()> {
 }))()"#,
         ) {
             Ok(value) => value,
-            Err(error) if error.to_string().contains("did not return a value") => {
+            Err(error) if is_navigation_race(&error) => {
                 thread::sleep(Duration::from_millis(50));
                 continue;
             }
@@ -278,6 +362,9 @@ fn wait_for_mermaid(client: &mut CdpClient, timeout: Duration) -> Result<()> {
             .unwrap_or("missing");
         let error = value.get("error").and_then(Value::as_str).unwrap_or("");
 
+        if status == "load-error" {
+            return Err(MermaidLoadError(error.to_string()).into());
+        }
         if status == "error" {
             bail!("Mermaid render failed: {error}");
         }
@@ -430,4 +517,93 @@ fn browser_app_paths() -> &'static [&'static str] {
         "/Applications/Chromium.app/Contents/MacOS/Chromium",
         "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+
+    fn run_retries(
+        outcomes: Vec<Result<()>>,
+    ) -> (Result<()>, Vec<usize>, Vec<Duration>, Vec<String>) {
+        let outcomes = RefCell::new(outcomes.into_iter());
+        let attempts = RefCell::new(Vec::new());
+        let sleeps = RefCell::new(Vec::new());
+        let logs = RefCell::new(Vec::new());
+        let result = retry_mermaid_load(
+            &MERMAID_LOAD_RETRY_DELAYS,
+            |delay| sleeps.borrow_mut().push(delay),
+            |message| logs.borrow_mut().push(message.to_string()),
+            |attempt| {
+                attempts.borrow_mut().push(attempt);
+                outcomes.borrow_mut().next().unwrap()
+            },
+        );
+        (
+            result,
+            attempts.into_inner(),
+            sleeps.into_inner(),
+            logs.into_inner(),
+        )
+    }
+
+    fn load_error() -> Result<()> {
+        Err(MermaidLoadError("Failed to fetch dynamically imported module".to_string()).into())
+    }
+
+    #[test]
+    fn succeeds_without_retrying() {
+        let (result, attempts, sleeps, logs) = run_retries(vec![Ok(())]);
+
+        assert!(result.is_ok());
+        assert_eq!(attempts, [0]);
+        assert!(sleeps.is_empty());
+        assert!(logs.is_empty());
+    }
+
+    #[test]
+    fn retries_load_errors_with_backoff_and_logs_each_retry() {
+        let (result, attempts, sleeps, logs) =
+            run_retries(vec![load_error(), load_error(), Ok(())]);
+
+        assert!(result.is_ok());
+        assert_eq!(attempts, [0, 1, 2]);
+        assert_eq!(sleeps, [Duration::from_secs(1), Duration::from_secs(3)]);
+        assert_eq!(
+            logs,
+            [
+                "Mermaid failed to load: Failed to fetch dynamically imported module. Retrying in 1s (retry 1 of 4)...",
+                "Mermaid failed to load: Failed to fetch dynamically imported module. Retrying in 3s (retry 2 of 4)...",
+            ]
+        );
+    }
+
+    #[test]
+    fn gives_up_after_all_delays() {
+        let (result, attempts, sleeps, logs) = run_retries((0..5).map(|_| load_error()).collect());
+
+        assert_eq!(attempts, [0, 1, 2, 3, 4]);
+        assert_eq!(sleeps, MERMAID_LOAD_RETRY_DELAYS);
+        assert_eq!(logs.len(), 4);
+        assert!(logs[3].contains("Retrying in 10s (retry 4 of 4)"));
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Mermaid failed to load after 5 attempts: Failed to fetch dynamically imported module"
+        );
+    }
+
+    #[test]
+    fn does_not_retry_diagram_errors() {
+        let (result, attempts, sleeps, logs) =
+            run_retries(vec![Err(anyhow!("Mermaid render failed: Parse error"))]);
+
+        assert_eq!(attempts, [0]);
+        assert!(sleeps.is_empty());
+        assert!(logs.is_empty());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Mermaid render failed: Parse error"
+        );
+    }
 }

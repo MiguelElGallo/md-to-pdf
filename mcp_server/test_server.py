@@ -310,6 +310,44 @@ class ToolInvocationTests(unittest.TestCase):
         self.assertTrue(result["isError"])
         self.assertIn("verify generated PDF", result["content"][0]["text"])
 
+    def test_timeout_covers_every_mermaid_retry(self) -> None:
+        self.assertEqual(server._conversion_timeout(None), 129)
+        self.assertEqual(server._conversion_timeout(1), 120)
+        self.assertEqual(server._conversion_timeout(60000), 379)
+        with (
+            mock.patch.object(server, "_find_md_to_pdf", return_value="/md-to-pdf"),
+            mock.patch.object(
+                server.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired([], 379),
+            ) as run,
+        ):
+            result = server._run_tool(
+                {"input": str(self.input), "virtual_time_budget_ms": 60000}
+            )
+        self.assertEqual(run.call_args.kwargs["timeout"], 379)
+        self.assertIn("timed out after 379 seconds", result["content"][0]["text"])
+
+    def test_success_forwards_diagnostics_to_server_log_only(self) -> None:
+        output = self.root / "input.pdf"
+        output.write_bytes(b"%PDF-1.4\nfixture")
+        retry = "Mermaid failed to load: x. Retrying in 1s (retry 1 of 4)..."
+        with (
+            mock.patch.object(server, "_find_md_to_pdf", return_value="/md-to-pdf"),
+            mock.patch.object(
+                server.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    [], 0, f"Wrote {output}\n", f"{retry}\n"
+                ),
+            ),
+            mock.patch.object(server.sys, "stderr", new_callable=io.StringIO) as log,
+        ):
+            result = server._run_tool({"input": str(self.input)})
+        self.assertNotIn("isError", result)
+        self.assertEqual(result["content"][0]["text"], str(output.resolve()))
+        self.assertIn(retry, log.getvalue())
+
 
 class PluginPackagingTests(unittest.TestCase):
     def test_release_versions_match(self) -> None:

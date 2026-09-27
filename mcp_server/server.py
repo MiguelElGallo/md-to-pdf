@@ -25,8 +25,8 @@ from typing import Any
 
 TOOL_NAME = "convert_markdown_to_pdf"
 SERVER_NAME = "md-to-pdf"
-SERVER_VERSION = "0.6.1"
-BINARY_VERSION = "0.6.1"
+SERVER_VERSION = "0.7.0"
+BINARY_VERSION = "0.7.0"
 PROTOCOL_VERSION = "2024-11-05"
 REPOSITORY = "MiguelElGallo/md-to-pdf"
 
@@ -344,12 +344,13 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     # from being parsed as a flag by clap.
     cmd.extend(["--", input_path])
 
+    timeout = _conversion_timeout(arguments.get("virtual_time_budget_ms"))
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=timeout,
             check=False,
         )
     except OSError as exc:
@@ -361,7 +362,10 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         return {
             "isError": True,
             "content": [
-                {"type": "text", "text": "md-to-pdf timed out after 120 seconds."}
+                {
+                    "type": "text",
+                    "text": f"md-to-pdf timed out after {timeout} seconds.",
+                }
             ],
         }
 
@@ -375,6 +379,11 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             "isError": True,
             "content": [{"type": "text", "text": f"md-to-pdf failed:\n{detail}"}],
         }
+
+    # Keep diagnostics such as Mermaid load retries visible in the MCP server log
+    # (stderr) without mixing them into the tool result.
+    if result.stderr.strip():
+        print(result.stderr.strip(), file=sys.stderr, flush=True)
 
     # Return the actual artifact, not arbitrary subprocess output.
     output_path = (
@@ -395,6 +404,19 @@ def _run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             ],
         }
     return {"content": [{"type": "text", "text": output_msg}]}
+
+
+# Mirrors MERMAID_LOAD_RETRY_DELAYS in src/browser.rs.
+_MERMAID_RETRY_DELAYS_SECONDS = (1, 3, 5, 10)
+_MIN_CONVERSION_TIMEOUT_SECONDS = 120
+
+
+def _conversion_timeout(budget_ms: object) -> int:
+    """Allow every Mermaid load attempt its full budget plus the retry delays."""
+    budget = budget_ms if isinstance(budget_ms, int) and budget_ms > 0 else 10_000
+    attempts = len(_MERMAID_RETRY_DELAYS_SECONDS) + 1
+    needed = -(-attempts * budget // 1000) + sum(_MERMAID_RETRY_DELAYS_SECONDS) + 60
+    return max(_MIN_CONVERSION_TIMEOUT_SECONDS, needed)
 
 
 def _validate_arguments(arguments: dict[str, Any]) -> None:

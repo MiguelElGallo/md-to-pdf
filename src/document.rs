@@ -175,11 +175,18 @@ fn mermaid_loader(source: &MermaidSource) -> String {
         MermaidSource::EsModuleUrl(url) => format!(
             r#"{}
 <script type="module">
+let mermaidModule;
 try {{
-  const module = await import("{}");
-  await renderMermaid(module.default);
+  mermaidModule = await import("{}");
 }} catch (error) {{
-  reportMermaidError(error);
+  reportMermaidError(error, true);
+}}
+if (mermaidModule) {{
+  try {{
+    await renderMermaid(mermaidModule.default);
+  }} catch (error) {{
+    reportMermaidError(error);
+  }}
 }}
 </script>"#,
             render_mermaid_function(),
@@ -217,9 +224,16 @@ async function renderMermaid(mermaid) {
   window.__MD_TO_PDF_READY = true;
 }
 
-function reportMermaidError(error) {
+// Mermaid lazily imports diagram chunks while rendering, so network failures
+// can also surface from mermaid.run().
+function isMermaidLoadError(messageText) {
+  return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed/i.test(messageText);
+}
+
+function reportMermaidError(error, isLoadError = false) {
   const messageText = error && error.message ? error.message : String(error);
-  document.documentElement.dataset.mermaidStatus = "error";
+  document.documentElement.dataset.mermaidStatus =
+    isLoadError || isMermaidLoadError(messageText) ? "load-error" : "error";
   window.__MD_TO_PDF_READY = false;
   window.__MD_TO_PDF_ERROR = messageText;
 
