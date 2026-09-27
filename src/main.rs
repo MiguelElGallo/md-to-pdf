@@ -203,7 +203,10 @@ fn paths_refer_to_same_file(left: &Utf8Path, right: &Utf8Path) -> bool {
 }
 
 fn input_base_href(input: &Utf8Path) -> Result<Option<String>> {
-    let parent = input.parent().unwrap_or_else(|| Utf8Path::new("."));
+    let parent = input
+        .parent()
+        .filter(|parent| !parent.as_str().is_empty())
+        .unwrap_or_else(|| Utf8Path::new("."));
     let url = file_url(parent)?;
     Ok(Some(url.to_string()))
 }

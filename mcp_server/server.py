@@ -25,8 +25,8 @@ from typing import Any
 
 TOOL_NAME = "convert_markdown_to_pdf"
 SERVER_NAME = "md-to-pdf"
-SERVER_VERSION = "0.6.0"
-BINARY_VERSION = "0.6.0"
+SERVER_VERSION = "0.6.1"
+BINARY_VERSION = "0.6.1"
 PROTOCOL_VERSION = "2024-11-05"
 REPOSITORY = "MiguelElGallo/md-to-pdf"
 
