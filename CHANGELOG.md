@@ -2,6 +2,20 @@
 
 All notable changes to md-to-pdf are documented here. The release workflow publishes the section matching the tag as the GitHub release notes, and refuses to publish a tag without one.
 
+## [0.7.1]
+
+### Fixed
+
+- Hard-linked PDF and debug HTML destinations can no longer overwrite the input Markdown or collide with one another.
+- PDF and HTML output use same-directory atomic replacement. Partial writes and failed replacements leave existing destinations unchanged and clean up temporary files; unrelated hard-linked backups remain untouched.
+- Output validation rejects symlinks, directories, special files, and read-only files before rendering, without blocking on named pipes.
+- Atomic replacement preserves ordinary file permission bits and rejects ownership, ACL, security-descriptor, or Windows encryption changes that could weaken file protection.
+- The existing `--virtual-time-budget` option is documented accurately as a per-attempt wall-clock readiness timeout, not Chromium virtual time or an end-to-end deadline.
+
+### Upgrade notes
+
+Use direct, writable output-file paths rather than symlinks. Unix outputs with extended ACLs, mismatched ownership, or special permission bits, and encrypted or security-incompatible Windows outputs, are rejected instead of silently losing their protection. New Unix output files request mode `0600`; Windows files use inherited security. Parent-directory symlinks remain supported. Debug HTML is retained when rendering fails and is not committed as a transaction with the PDF.
+
 ## [0.7.0]
 
 ### Added

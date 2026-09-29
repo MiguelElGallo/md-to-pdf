@@ -2,11 +2,11 @@ use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Parser;
 use md_to_pdf::browser::{file_url, print_to_pdf, BrowserOptions};
-use md_to_pdf::default_output_path;
 use md_to_pdf::document::{
     parse_page_size, render_document, DocumentOptions, MermaidSource, PageSize, DEFAULT_MERMAID_URL,
 };
 use md_to_pdf::markdown::{markdown_to_body, HtmlOptions};
+use md_to_pdf::{default_output_path, validate_output_file, write_output_atomic};
 use std::fs;
 use tempfile::tempdir;
 
@@ -56,7 +56,7 @@ struct Cli {
     #[arg(long)]
     allow_remote_assets: bool,
 
-    /// Browser virtual time budget in milliseconds for Mermaid and layout before PDF printing.
+    /// Per-attempt wall-clock timeout in milliseconds for page load and Mermaid readiness. Browser startup and retry delays are separate; browser commands can overrun this timeout. Not Chromium virtual time.
     #[arg(long, default_value_t = 10_000)]
     virtual_time_budget: u64,
 
@@ -135,13 +135,7 @@ fn run(cli: Cli) -> Result<()> {
             anyhow::anyhow!("temporary path is not valid UTF-8: {}", path.display())
         })?
     };
-    if let Some(parent) = html_path.parent() {
-        if !parent.as_str().is_empty() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create HTML output directory {parent}"))?;
-        }
-    }
-    fs::write(&html_path, document).with_context(|| format!("failed to write {html_path}"))?;
+    write_output_atomic(&html_path, document.as_bytes())?;
 
     print_to_pdf(
         &html_path,
@@ -168,19 +162,21 @@ fn validate_input(input: &Utf8Path) -> Result<()> {
 }
 
 fn validate_output_paths(input: &Utf8Path, output: &Utf8Path, keep_html: bool) -> Result<()> {
-    if paths_refer_to_same_file(input, output) {
+    validate_output_file(output)?;
+    if paths_refer_to_same_file(input, output)? {
         anyhow::bail!("output path would overwrite the input file: {output}");
     }
 
     if keep_html {
         let html = output.with_extension("html");
-        if paths_refer_to_same_file(input, &html) {
+        validate_output_file(&html)?;
+        if paths_refer_to_same_file(input, &html)? {
             anyhow::bail!("HTML debug path would overwrite the input file: {html}");
         }
         if output
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("html"))
-            || paths_refer_to_same_file(output, &html)
+            || paths_refer_to_same_file(output, &html)?
         {
             anyhow::bail!(
                 "HTML debug path conflicts with the PDF output: choose an output path that does not end in .html"
@@ -191,14 +187,16 @@ fn validate_output_paths(input: &Utf8Path, output: &Utf8Path, keep_html: bool) -
     Ok(())
 }
 
-fn paths_refer_to_same_file(left: &Utf8Path, right: &Utf8Path) -> bool {
+fn paths_refer_to_same_file(left: &Utf8Path, right: &Utf8Path) -> Result<bool> {
     if left == right {
-        return true;
+        return Ok(true);
     }
 
-    match (left.canonicalize_utf8(), right.canonicalize_utf8()) {
-        (Ok(left), Ok(right)) => left == right,
-        _ => false,
+    match same_file::is_same_file(left, right) {
+        Ok(same) => Ok(same),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error)
+            .with_context(|| format!("failed to compare file identities for {left} and {right}")),
     }
 }
 
