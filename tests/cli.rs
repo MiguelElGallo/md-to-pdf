@@ -17,7 +17,9 @@ fn help_includes_core_options() {
         .stdout(predicate::str::contains("--output"))
         .stdout(predicate::str::contains("--mermaid-js"))
         .stdout(predicate::str::contains("--allow-remote-assets"))
-        .stdout(predicate::str::contains("--browser"));
+        .stdout(predicate::str::contains("--browser"))
+        .stdout(predicate::str::contains("Per-attempt wall-clock timeout"))
+        .stdout(predicate::str::contains("Not Chromium virtual time"));
 }
 
 #[test]
@@ -106,6 +108,53 @@ fn output_path_cannot_overwrite_input() {
 }
 
 #[test]
+fn output_paths_reject_hard_link_aliases() {
+    for collision in ["input-pdf", "input-html", "pdf-html"] {
+        let temp_dir = tempdir().unwrap();
+        let input = temp_dir.path().join("source.md");
+        let output = temp_dir.path().join("out.pdf");
+        let html = output.with_extension("html");
+        fs::write(&input, "# Original document\n").unwrap();
+        let expected_error = match collision {
+            "input-pdf" => {
+                fs::hard_link(&input, &output).unwrap();
+                "output path would overwrite the input file"
+            }
+            "input-html" => {
+                fs::hard_link(&input, &html).unwrap();
+                "HTML debug path would overwrite the input file"
+            }
+            "pdf-html" => {
+                fs::write(&output, "Original PDF").unwrap();
+                fs::hard_link(&output, &html).unwrap();
+                "HTML debug path conflicts with the PDF output"
+            }
+            _ => unreachable!(),
+        };
+
+        Command::cargo_bin("md-to-pdf")
+            .unwrap()
+            .args([
+                input.to_str().unwrap(),
+                "--output",
+                output.to_str().unwrap(),
+                "--keep-html",
+                "--browser",
+                "/definitely/not/a/browser",
+            ])
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains(expected_error));
+
+        assert_eq!(fs::read_to_string(&input).unwrap(), "# Original document\n");
+        if collision == "pdf-html" {
+            assert_eq!(fs::read_to_string(&output).unwrap(), "Original PDF");
+            assert_eq!(fs::read_to_string(&html).unwrap(), "Original PDF");
+        }
+    }
+}
+
+#[test]
 fn keep_html_rejects_an_html_pdf_output_path() {
     let temp_dir = tempdir().unwrap();
     let output = temp_dir.path().join("output.HTML");
@@ -127,6 +176,56 @@ fn keep_html_rejects_an_html_pdf_output_path() {
         ));
 
     assert!(!output.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn output_paths_reject_existing_and_dangling_symlinks() {
+    for keep_html in [false, true] {
+        for dangling in [false, true] {
+            let temp_dir = tempdir().unwrap();
+            let input = temp_dir.path().join("source.md");
+            let output = temp_dir.path().join("out.pdf");
+            let target = temp_dir.path().join("target");
+            let link = if keep_html {
+                output.with_extension("html")
+            } else {
+                output.clone()
+            };
+            fs::write(&input, "# Original document\n").unwrap();
+            if !dangling {
+                fs::write(&target, "Original target").unwrap();
+            }
+            std::os::unix::fs::symlink(&target, &link).unwrap();
+
+            let mut command = Command::cargo_bin("md-to-pdf").unwrap();
+            command.args([
+                input.to_str().unwrap(),
+                "--output",
+                output.to_str().unwrap(),
+                "--browser",
+                "/definitely/not/a/browser",
+            ]);
+            if keep_html {
+                command.arg("--keep-html");
+            }
+            command
+                .assert()
+                .failure()
+                .stderr(predicate::str::contains("output path is a symlink"));
+
+            assert!(fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink());
+            assert_eq!(fs::read_to_string(&input).unwrap(), "# Original document\n");
+            if dangling {
+                assert!(!target.exists());
+            } else {
+                assert_eq!(fs::read_to_string(&target).unwrap(), "Original target");
+            }
+        }
+    }
 }
 
 #[test]
@@ -153,6 +252,55 @@ fn keep_html_creates_output_parent_directory_before_browser_discovery() {
     assert!(fs::read_to_string(html)
         .unwrap()
         .contains("Markdown to PDF"));
+}
+
+#[cfg(unix)]
+#[test]
+fn output_paths_reject_fifos_without_blocking() {
+    for keep_html in [false, true] {
+        for use_symlink in [false, true] {
+            let directory = tempdir().unwrap();
+            let input = directory.path().join("source.md");
+            let output = directory.path().join("out.pdf");
+            let destination = if keep_html {
+                output.with_extension("html")
+            } else {
+                output.clone()
+            };
+            let fifo = directory.path().join("pipe");
+            fs::write(&input, "# Original document\n").unwrap();
+            let fifo_path = if use_symlink { &fifo } else { &destination };
+            assert!(std::process::Command::new("mkfifo")
+                .arg(fifo_path)
+                .status()
+                .unwrap()
+                .success());
+            if use_symlink {
+                std::os::unix::fs::symlink(&fifo, &destination).unwrap();
+            }
+
+            let mut command = Command::cargo_bin("md-to-pdf").unwrap();
+            command.timeout(Duration::from_secs(5)).args([
+                input.to_str().unwrap(),
+                "--output",
+                output.to_str().unwrap(),
+                "--browser",
+                "/definitely/not/a/browser",
+            ]);
+            if keep_html {
+                command.arg("--keep-html");
+            }
+            command
+                .assert()
+                .failure()
+                .stderr(predicate::str::contains(if use_symlink {
+                    "output path is a symlink"
+                } else {
+                    "output path is not a regular file"
+                }));
+            assert_eq!(fs::read_to_string(&input).unwrap(), "# Original document\n");
+        }
+    }
 }
 
 #[test]
@@ -190,6 +338,7 @@ fn browser_smoke_plain_markdown() {
     };
     let temp_dir = tempdir().unwrap();
     let output = temp_dir.path().join("basic.pdf");
+    fs::write(&output, "Previous PDF").unwrap();
 
     Command::cargo_bin("md-to-pdf")
         .unwrap()
@@ -203,7 +352,7 @@ fn browser_smoke_plain_markdown() {
         .assert()
         .success();
 
-    assert!(fs::metadata(output).unwrap().len() > 0);
+    assert!(fs::read(output).unwrap().starts_with(b"%PDF-"));
 }
 
 #[test]
@@ -285,6 +434,7 @@ fn browser_smoke_invalid_mermaid_fails() {
     };
     let temp_dir = tempdir().unwrap();
     let output = temp_dir.path().join("invalid.pdf");
+    fs::write(&output, "Previous PDF").unwrap();
 
     Command::cargo_bin("md-to-pdf")
         .unwrap()
@@ -296,6 +446,7 @@ fn browser_smoke_invalid_mermaid_fails() {
             &browser,
             "--virtual-time-budget",
             "15000",
+            "--keep-html",
         ])
         .assert()
         .failure()
@@ -303,6 +454,9 @@ fn browser_smoke_invalid_mermaid_fails() {
             "Mermaid render failed: Parse error",
         ))
         .stderr(predicate::str::contains("Mermaid failed to load after").not());
+
+    assert_eq!(fs::read_to_string(&output).unwrap(), "Previous PDF");
+    assert!(output.with_extension("html").exists());
 }
 
 #[test]

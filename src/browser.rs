@@ -56,12 +56,7 @@ pub fn print_to_pdf(
         None => discover_browser()?,
     };
 
-    if let Some(parent) = pdf_path.parent() {
-        if !parent.as_str().is_empty() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create output directory {parent}"))?;
-        }
-    }
+    crate::validate_output_file(pdf_path)?;
 
     let html_url = file_url(html_path)?;
     let mut browser_process = BrowserProcess::launch(&browser, options)?;
@@ -103,7 +98,7 @@ pub fn print_to_pdf(
         bail!("browser returned an empty PDF");
     }
 
-    fs::write(pdf_path, bytes).with_context(|| format!("failed to write {pdf_path}"))?;
+    crate::write_output_atomic(pdf_path, &bytes)?;
     browser_process.close_with(&mut client);
     Ok(())
 }
